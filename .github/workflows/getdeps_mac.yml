@@ -5,17 +5,17 @@ name: mac
 on:
   push:
     branches:
-    - main
+    - macos_ci
   pull_request:
     branches:
-    - main
+    - macos_ci
 
 permissions:
   contents: read  #  to fetch code (actions/checkout)
 
 jobs:
   build:
-    runs-on: macOS-latest
+    runs-on: macos-15
     steps:
     - uses: actions/checkout@v4
     - name: Show disk space at start
