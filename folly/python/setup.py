@@ -19,6 +19,7 @@
 # created as tree of links to the real source files.
 
 import argparse
+import os
 import sys
 
 import Cython
@@ -67,26 +68,71 @@ if is_api_only:
         language_level=3,
     )
 else:
+    extra_link_args = []
+    ldflags_str = os.environ.get("LDFLAGS", "")
+    if ldflags_str:
+        import shlex
+
+        extra_link_args.extend(shlex.split(ldflags_str))
+
+    if sys.platform == "darwin":
+        if "-undefined" not in ldflags_str:
+            extra_link_args.extend(["-undefined", "dynamic_lookup"])
+
     exts = [
         Extension(
             "folly.executor",
             sources=["folly/executor.pyx", "folly/ProactorExecutor.cpp"],
             libraries=["folly_python_cpp", "folly", "glog"],
             extra_compile_args=["-std=c++20"],
+            extra_link_args=extra_link_args,
         ),
         Extension(
             "folly.iobuf",
             sources=["folly/iobuf.pyx", "folly/iobuf_ext.cpp"],
             libraries=["folly_python_cpp", "folly", "glog"],
             extra_compile_args=["-std=c++20"],
+            extra_link_args=extra_link_args,
+        ),
+        Extension(
+            "folly.build_mode",
+            sources=["folly/build_mode.pyx"],
+            libraries=["folly_python_cpp", "folly", "glog"],
+            extra_compile_args=["-std=c++20"],
+            extra_link_args=extra_link_args,
+        ),
+        Extension(
+            "folly.fiber_manager",
+            sources=["folly/fiber_manager.pyx", "folly/fibers.cpp"],
+            libraries=["folly_python_cpp", "folly", "glog"],
+            extra_compile_args=["-std=c++20"],
+            extra_link_args=extra_link_args,
+        ),
+        Extension(
+            "folly.request_context",
+            sources=["folly/request_context.pyx"],
+            libraries=["folly_python_cpp", "folly", "glog"],
+            extra_compile_args=["-std=c++20"],
+            extra_link_args=extra_link_args,
         ),
     ]
 
     setup(
         name="folly",
         version="0.0.1",
-        packages=["folly"],
-        package_data={"": ["*.pxd", "*.h"]},
+        packages=["folly", "folly.python"],
+        package_data={
+            "": [
+                "*.pyi",
+                "*.pxd",
+                "*.pyx",
+                "*.py",
+                "*.h",
+                "*.so",
+                "*.dylib",
+                "py.typed",
+            ],
+        },
         setup_requires=["cython"],
         zip_safe=False,
         ext_modules=cythonize(exts, compiler_directives={"language_level": 3}),
