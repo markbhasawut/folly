@@ -84,43 +84,60 @@ else:
             "folly.executor",
             sources=["folly/executor.pyx", "folly/ProactorExecutor.cpp"],
             libraries=["folly_python_cpp", "folly", "glog"],
-            extra_compile_args=["-std=c++20"],
+            language="c++",
+            extra_compile_args=["-std=c++20", "-DGLOG_USE_GLOG_EXPORT"],
             extra_link_args=extra_link_args,
         ),
         Extension(
             "folly.iobuf",
             sources=["folly/iobuf.pyx", "folly/iobuf_ext.cpp"],
             libraries=["folly_python_cpp", "folly", "glog"],
-            extra_compile_args=["-std=c++20"],
+            language="c++",
+            extra_compile_args=["-std=c++20", "-DGLOG_USE_GLOG_EXPORT"],
             extra_link_args=extra_link_args,
         ),
         Extension(
             "folly.build_mode",
             sources=["folly/build_mode.pyx"],
             libraries=["folly_python_cpp", "folly", "glog"],
-            extra_compile_args=["-std=c++20"],
+            language="c++",
+            extra_compile_args=["-std=c++20", "-DGLOG_USE_GLOG_EXPORT"],
             extra_link_args=extra_link_args,
         ),
         Extension(
             "folly.fiber_manager",
             sources=["folly/fiber_manager.pyx", "folly/fibers.cpp"],
             libraries=["folly_python_cpp", "folly", "glog"],
-            extra_compile_args=["-std=c++20"],
+            language="c++",
+            extra_compile_args=["-std=c++20", "-DGLOG_USE_GLOG_EXPORT"],
             extra_link_args=extra_link_args,
         ),
         Extension(
             "folly.request_context",
             sources=["folly/request_context.pyx"],
             libraries=["folly_python_cpp", "folly", "glog"],
-            extra_compile_args=["-std=c++20"],
+            language="c++",
+            extra_compile_args=["-std=c++20", "-DGLOG_USE_GLOG_EXPORT"],
             extra_link_args=extra_link_args,
         ),
     ]
 
+    if sys.platform == "win32":
+        exts.append(
+            Extension(
+                "folly.windows.iocp",
+                sources=["folly/windows/iocp.pyx"],
+                libraries=["folly_python_cpp", "folly", "glog"],
+                language="c++",
+                extra_compile_args=["/std:c++20", "-DGLOG_USE_GLOG_EXPORT"],
+                extra_link_args=extra_link_args,
+            )
+        )
+
     setup(
         name="folly",
         version="0.0.1",
-        packages=["folly", "folly.python"],
+        packages=["folly", "folly.python", "folly.windows"],
         package_data={
             "": [
                 "*.pyi",
@@ -130,6 +147,7 @@ else:
                 "*.h",
                 "*.so",
                 "*.dylib",
+                "*.dll",
                 "py.typed",
             ],
         },

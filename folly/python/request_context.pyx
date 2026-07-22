@@ -147,11 +147,11 @@ cdef extern from "folly/python/request_context.h":
         Py_CONTEXT_SWITCHED = 1
 
     cdef int FOLLY_PYTHON_PyContext_AddWatcher(
-        int(*PyContext_WatchCallback)(PyContextEvent, PyObject* pycontext)
+        int(*PyContext_WatchCallback)(PyContextEvent, PyObject* pycontext) noexcept
     )
 
 
-cdef int _watcher(PyContextEvent event, PyObject* pycontext):
+cdef int _watcher(PyContextEvent event, PyObject* pycontext) noexcept:
     cdef shared_ptr[RequestContext] ctx
 
     if pycontext is NULL or event != PyContextEvent.Py_CONTEXT_SWITCHED:

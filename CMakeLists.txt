@@ -80,6 +80,7 @@ option(PYTHON_EXTENSIONS
 )
 # Python extensions require shared libraries for proper symbol resolution
 if (PYTHON_EXTENSIONS)
+  set(Python3_FIND_VIRTUALENV FIRST)
   set(BUILD_SHARED_LIBS ON CACHE BOOL
     "Forced ON because PYTHON_EXTENSIONS requires shared libraries" FORCE)
 endif()

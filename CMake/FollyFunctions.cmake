@@ -327,11 +327,109 @@ function(folly_define_tests)
       # Strip the tailing test directory name for the folder name.
       string(REPLACE "test/" "" test_dir_name "${cur_dir_name}")
       set_property(TARGET ${cur_test_name} PROPERTY FOLDER "Tests/${test_dir_name}")
+      set_target_properties(${cur_test_name} PROPERTIES
+        BUILD_WITH_INSTALL_RPATH OFF
+        BUILD_RPATH "${CMAKE_BINARY_DIR};${CMAKE_BINARY_DIR}/folly/python"
+      )
       target_link_libraries(${cur_test_name} PRIVATE folly_test_support)
       apply_folly_compile_options_to_target(${cur_test_name})
     endif()
     math(EXPR cur_test "${cur_test} + 1")
   endwhile()
+endfunction()
+
+function(folly_define_python_tests)
+  cmake_parse_arguments(
+    ARG
+    ""
+    ""
+    "CPP_TESTS;PYTHON_TESTS"
+    ${ARGN}
+  )
+
+  if(NOT PYTHON_CMD)
+    if(Python3_EXECUTABLE)
+      set(PYTHON_CMD "${Python3_EXECUTABLE}")
+    else()
+      set(PYTHON_CMD "python3")
+    endif()
+  endif()
+
+  foreach(test_name IN LISTS ARG_CPP_TESTS)
+    string(TOLOWER "${test_name}" _test_name_lower)
+    if(_test_name_lower MATCHES "^python_")
+      set(target_name "folly_${_test_name_lower}")
+    elseif(_test_name_lower MATCHES "^folly_python_")
+      set(target_name "${_test_name_lower}")
+    else()
+      string(REGEX REPLACE "test$" "" _base "${_test_name_lower}")
+      set(target_name "folly_python_${_base}_test")
+    endif()
+
+    add_executable(${target_name}
+      "${test_name}.cpp"
+    )
+    target_include_directories(${target_name}
+      PRIVATE
+        ${GTEST_INCLUDE_DIRS}
+        ${LIBGMOCK_INCLUDE_DIR}
+        ${Python3_INCLUDE_DIRS}
+        ${_cybld}
+        ${TOP_DIR}
+    )
+    target_link_libraries(${target_name}
+      PRIVATE
+        folly_python_cpp
+        folly_test_support
+        folly
+        Python3::Python
+        ${LIBGMOCK_LIBRARIES}
+    )
+    apply_folly_compile_options_to_target(${target_name})
+    set_target_properties(${target_name} PROPERTIES
+      BUILD_WITH_INSTALL_RPATH OFF
+      BUILD_RPATH "${CMAKE_BINARY_DIR};${CMAKE_BINARY_DIR}/folly/python"
+      INSTALL_RPATH "${CMAKE_BINARY_DIR};${CMAKE_BINARY_DIR}/folly/python;${CMAKE_INSTALL_PREFIX}/lib"
+    )
+    if(HAVE_CMAKE_GTEST)
+      gtest_add_tests(TARGET ${target_name}
+                      WORKING_DIRECTORY "${TOP_DIR}"
+                      TEST_PREFIX "${target_name}."
+                      TEST_LIST test_cases)
+      set_tests_properties(${test_cases} PROPERTIES TIMEOUT 120)
+    else()
+      add_test(
+        NAME ${target_name}
+        COMMAND ${target_name}
+        WORKING_DIRECTORY "${TOP_DIR}"
+      )
+      set_tests_properties(${target_name} PROPERTIES TIMEOUT 120)
+    endif()
+  endforeach()
+
+  foreach(test_script IN LISTS ARG_PYTHON_TESTS)
+    get_filename_component(test_base "${test_script}" NAME_WE)
+    string(TOLOWER "${test_base}" _base_lower)
+    if(_base_lower MATCHES "^python_")
+      set(py_test_name "folly_${_base_lower}")
+    elseif(_base_lower MATCHES "^folly_python_")
+      set(py_test_name "${_base_lower}")
+    else()
+      string(REGEX REPLACE "^test_" "" _clean_base "${_base_lower}")
+      string(REGEX REPLACE "_test$" "" _clean_base "${_clean_base}")
+      set(py_test_name "folly_python_${_clean_base}_test")
+    endif()
+
+    add_test(
+      NAME ${py_test_name}
+      COMMAND ${Python3_EXECUTABLE} -m unittest ${CMAKE_CURRENT_SOURCE_DIR}/${test_script}
+      WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+    )
+    set_tests_properties(${py_test_name} PROPERTIES
+      ENVIRONMENT "PYTHONPATH=${_cybld}:$ENV{PYTHONPATH};DYLD_LIBRARY_PATH=${CMAKE_BINARY_DIR}:${CMAKE_BINARY_DIR}/folly/python:$ENV{DYLD_LIBRARY_PATH};LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}:${CMAKE_BINARY_DIR}/folly/python:$ENV{LD_LIBRARY_PATH}"
+      TIMEOUT 120
+    )
+  endforeach()
 endfunction()
 
 # Initialize global property to track all granular component targets
