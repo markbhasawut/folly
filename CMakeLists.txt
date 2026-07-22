@@ -1069,6 +1069,7 @@ if (BUILD_TESTS OR BUILD_BENCHMARKS)
     apply_folly_compile_options_to_target(singleton_thread_local_overload)
     set_target_properties(singleton_thread_local_overload PROPERTIES
       PREFIX ""
+      SUFFIX ".so"
       LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/folly/test
     )
     target_link_libraries(singleton_thread_local_overload PRIVATE folly)

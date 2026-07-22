@@ -18,6 +18,7 @@
 
 #include <filesystem>
 #include <boost/filesystem.hpp>
+#include <folly/CPortability.h>
 
 namespace folly {
 namespace fs {
@@ -39,20 +40,22 @@ using namespace ::boost::filesystem;
  * /foo/bar/ is not a prefix of /foo/bar, but both /foo/bar and /foo/bar/
  * are prefixes of /foo/bar/baz.
  */
-bool starts_with(const path& p, const path& prefix);
+FOLLY_EXPORT bool starts_with(const path& p, const path& prefix);
 
 /**
  * If "path" starts with "prefix", return "path" with "prefix" removed.
  * Otherwise, throw filesystem_error.
  */
-path remove_prefix(const path& p, const path& prefix);
+FOLLY_EXPORT path remove_prefix(const path& p, const path& prefix);
 
 /**
  * Canonicalize the parent path, leaving the filename (last component)
  * unchanged.  You may use this before creating a file instead of
  * boost::filesystem::canonical, which requires that the entire path exists.
  */
-path canonical_parent(const path& p, const path& basePath = current_path());
+FOLLY_EXPORT path canonical_parent(
+    const path& p,
+    const path& basePath = current_path());
 
 /**
  * Get the path to the current executable.
@@ -66,7 +69,7 @@ path canonical_parent(const path& p, const path& basePath = current_path());
  *
  * So this should only be used for tests, logging, or other innocuous purposes.
  */
-path executable_path();
+FOLLY_EXPORT path executable_path();
 
 struct unique_path_fn {
   std_fs::path operator()(
