@@ -55,7 +55,7 @@ TEST(Simple, Path) {
   EXPECT_TRUE(starts_with(abs1, root));
   EXPECT_FALSE(starts_with(rel1, root));
   EXPECT_EQ(path("hello/world"), remove_prefix(abs1, root));
-  EXPECT_THROW({ remove_prefix(rel1, root); }, filesystem_error);
+  EXPECT_THROW({ remove_prefix(rel1, root); }, boost::system::system_error);
 
   path abs2("/hello");
   path abs3("/hello/");
@@ -70,8 +70,8 @@ TEST(Simple, Path) {
   EXPECT_EQ(path("world"), remove_prefix(abs1, abs2));
   EXPECT_EQ(path("world"), remove_prefix(abs1, abs3));
   EXPECT_EQ(path(), remove_prefix(abs1, abs4));
-  EXPECT_THROW({ remove_prefix(abs1, abs5); }, filesystem_error);
-  EXPECT_THROW({ remove_prefix(abs1, abs6); }, filesystem_error);
+  EXPECT_THROW({ remove_prefix(abs1, abs5); }, boost::system::system_error);
+  EXPECT_THROW({ remove_prefix(abs1, abs6); }, boost::system::system_error);
 }
 
 TEST(Simple, CanonicalizeParent) {
