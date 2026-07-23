@@ -1,0 +1,15 @@
+[package]
+name = "folly_dynamic"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+path = "dynamic.rs"
+
+[dependencies]
+cxx = "1.0"
+string = { version = "0.1.0", path = "../string" }
+
+[build-dependencies]
+cxx-build = "1.0"
+pkg-config = "0.3"

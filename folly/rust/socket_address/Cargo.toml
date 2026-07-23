@@ -1,0 +1,16 @@
+[package]
+name = "socket_address"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+path = "lib.rs"
+
+[dependencies]
+anyhow = "1.0"
+cxx = "1.0"
+network_address = { version = "0.1.0", path = "../network_address" }
+
+[build-dependencies]
+cxx-build = "1.0"
+pkg-config = "0.3"

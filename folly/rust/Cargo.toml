@@ -1,0 +1,17 @@
+[workspace]
+members = [
+    "compression",
+    "dynamic",
+    "iobuf",
+    "iobuf_sys",
+    "logging",
+    "memory",
+    "network_address",
+    "request_context",
+    "singleton_vault",
+    "socket_address",
+    "string",
+    "string_sys",
+    "tdigest",
+]
+resolver = "2"

@@ -1,0 +1,17 @@
+[package]
+name = "folly_compression"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+path = "compression.rs"
+
+[dependencies]
+bytes = { version = "1.9.0", features = ["serde"] }
+cxx = "1.0"
+iobuf = { version = "0.1.0", path = "../iobuf" }
+thiserror = "2.0"
+
+[build-dependencies]
+cxx-build = "1.0"
+pkg-config = "0.3"

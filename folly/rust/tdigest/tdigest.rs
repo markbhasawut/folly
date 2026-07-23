@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
+
 use cxx::ExternType;
 use cxx::type_id;
 pub use root::folly;
@@ -75,7 +77,7 @@ pub mod bridge {
 
 #[cfg(test)]
 mod tests {
-    use rand::rng;
+    use rand::thread_rng;
     use rand::seq::SliceRandom;
 
     use super::bridge::*;
@@ -195,7 +197,7 @@ mod tests {
         }
 
         let mut tdigest_vec = new_tdigest_vec();
-        let mut rng = rng();
+        let mut rng = thread_rng();
         unsorted_values.shuffle(&mut rng);
 
         for i in 0..10 {

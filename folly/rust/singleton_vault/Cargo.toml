@@ -1,0 +1,15 @@
+[package]
+name = "singleton_vault"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+path = "lib.rs"
+
+[dependencies]
+anyhow = "1.0"
+cxx = "1.0"
+
+[build-dependencies]
+cxx-build = "1.0"
+pkg-config = "0.3"

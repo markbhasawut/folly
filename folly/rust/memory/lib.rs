@@ -85,7 +85,7 @@ pub fn is_using_jemalloc() -> bool {
 /// # Examples
 ///
 /// ```no_run
-/// # use memory::mallctl_write;
+/// # use folly_memory::mallctl_write;
 /// #
 /// // Write a heap dump to `heapdump.dmp`
 /// mallctl_write("prof.dump", "heapdump.dmp").unwrap();
@@ -100,7 +100,7 @@ pub fn mallctl_write<T: MallctlValueWrite>(cmd: &str, value: T) -> Result<()> {
 /// # Examples
 ///
 /// ```no_run
-/// # use memory::mallctl_read;
+/// # use folly_memory::mallctl_read;
 /// #
 /// // Read whether or not profiling is enabled in this build of jemalloc.
 /// let profiling_enabled = mallctl_read::<bool>("config.prof").unwrap();
@@ -114,7 +114,7 @@ pub fn mallctl_read<T: MallctlValueRead>(cmd: &str) -> Result<T> {
 /// # Examples
 ///
 /// ```no_run
-/// # use memory::mallctl_call;
+/// # use folly_memory::mallctl_call;
 /// #
 /// // Advance the JEMalloc epoch to flush in-flight data to stats.
 /// mallctl_call("epoch").unwrap();

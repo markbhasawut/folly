@@ -14,7 +14,9 @@
  * limitations under the License.
  */
 
+#[allow(unused_imports)]
 use std::cmp;
+#[allow(unused_imports)]
 use std::collections::BTreeMap;
 
 use bytes::Buf;
