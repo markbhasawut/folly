@@ -46,6 +46,30 @@ find_package(Boost 1.69.0 REQUIRED
     thread
 )
 
+# Some Boost binary packages expose Regex's ICU dependencies as bare library
+# names. Replace those with CMake's imported ICU targets so downstream links
+# do not depend on an ambient LIBRARY_PATH.
+get_target_property(
+  _folly_boost_regex_links Boost::regex INTERFACE_LINK_LIBRARIES)
+list(FIND _folly_boost_regex_links "icudata" _folly_icu_index)
+if(NOT _folly_icu_index EQUAL -1)
+  find_dependency(ICU COMPONENTS data i18n uc)
+  set(_folly_boost_regex_links_normalized)
+  foreach(_folly_link IN LISTS _folly_boost_regex_links)
+    if(_folly_link STREQUAL "icudata")
+      list(APPEND _folly_boost_regex_links_normalized ICU::data)
+    elseif(_folly_link STREQUAL "icui18n")
+      list(APPEND _folly_boost_regex_links_normalized ICU::i18n)
+    elseif(_folly_link STREQUAL "icuuc")
+      list(APPEND _folly_boost_regex_links_normalized ICU::uc)
+    else()
+      list(APPEND _folly_boost_regex_links_normalized "${_folly_link}")
+    endif()
+  endforeach()
+  set_property(TARGET Boost::regex PROPERTY INTERFACE_LINK_LIBRARIES
+    "${_folly_boost_regex_links_normalized}")
+endif()
+
 if (NOT folly_FIND_QUIETLY)
   message(STATUS "Found folly: ${FOLLY_PREFIX_DIR}")
 endif()

@@ -53,6 +53,31 @@ find_package(Boost 1.69.0 REQUIRED
   COMPONENTS
     ${FOLLY_BOOST_COMPONENTS}
 )
+
+# Homebrew Boost 1.90 exports Regex's ICU dependencies as bare library names.
+# Normalize them to imported targets so Folly itself builds without relying on
+# an ambient LIBRARY_PATH.
+get_target_property(
+  _folly_boost_regex_links Boost::regex INTERFACE_LINK_LIBRARIES)
+list(FIND _folly_boost_regex_links "icudata" _folly_icu_index)
+if(NOT _folly_icu_index EQUAL -1)
+  find_package(ICU REQUIRED COMPONENTS data i18n uc)
+  set(_folly_boost_regex_links_normalized)
+  foreach(_folly_link IN LISTS _folly_boost_regex_links)
+    if(_folly_link STREQUAL "icudata")
+      list(APPEND _folly_boost_regex_links_normalized ICU::data)
+    elseif(_folly_link STREQUAL "icui18n")
+      list(APPEND _folly_boost_regex_links_normalized ICU::i18n)
+    elseif(_folly_link STREQUAL "icuuc")
+      list(APPEND _folly_boost_regex_links_normalized ICU::uc)
+    else()
+      list(APPEND _folly_boost_regex_links_normalized "${_folly_link}")
+    endif()
+  endforeach()
+  set_property(TARGET Boost::regex PROPERTY INTERFACE_LINK_LIBRARIES
+    "${_folly_boost_regex_links_normalized}")
+endif()
+
 # Only add include directories globally, not libraries
 # Per-target Boost dependencies are specified via EXTERNAL_DEPS
 list(APPEND FOLLY_INCLUDE_DIRECTORIES ${Boost_INCLUDE_DIRS})

@@ -453,6 +453,20 @@ if (BUILD_TESTS OR BUILD_BENCHMARKS)
       glog::glog
   )
   apply_folly_compile_options_to_target(folly_test_support)
+  target_compile_definitions(folly_test_support PRIVATE
+    FOLLY_CERTS_DIR="${CMAKE_INSTALL_PREFIX}/share/folly/io/async/test/certs"
+  )
+
+  # Downstream projects use Folly's socket and TLS test helpers too. Install
+  # their implementation and data when tests are explicitly enabled.
+  install(TARGETS folly_test_support
+    RUNTIME DESTINATION bin
+    LIBRARY DESTINATION ${LIB_INSTALL_DIR}
+    ARCHIVE DESTINATION ${LIB_INSTALL_DIR}
+  )
+  install(DIRECTORY ${FOLLY_DIR}/io/async/test/certs
+    DESTINATION share/folly/io/async/test
+  )
 
   folly_define_tests(
     DIRECTORY algorithm/simd/detail/test/

@@ -169,6 +169,7 @@ set(libs "-L${CMAKE_CURRENT_BINARY_DIR}:${CMAKE_BINARY_DIR}:${glog_lib}")
 if(APPLE)
   string(
     CONCAT DEFAULT_SETUP_LDFLAGS
+    "-Wl,-rpath,${CMAKE_INSTALL_PREFIX}/${LIB_INSTALL_DIR} "
     "-Wl,-undefined,dynamic_lookup "
     "-Wl,-rpath,${CMAKE_CURRENT_BINARY_DIR} "
     "-Wl,-rpath,${CMAKE_BINARY_DIR}"

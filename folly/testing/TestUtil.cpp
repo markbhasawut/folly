@@ -238,10 +238,14 @@ fs::path find_resource(std::string_view resource) {
     throw std::invalid_argument("invalid: " + std::string(resource));
   }
   auto const ext = folly::ext::test_find_resource;
-  auto fn = ext //
-      ? fs::path(ext(resource)) // hooked, eg via internal extension
-      : fs::executable_path().parent_path() //
-          / std::string(resource); // current cmake build
+  auto const resourcePath = fs::path(std::string(resource));
+  auto fn = resourcePath;
+  if (!resourcePath.is_absolute()) {
+    fn = ext
+        ? fs::path(ext(resource)) // hooked, eg via internal extension
+        : fs::executable_path().parent_path() /
+            resourcePath; // current cmake build
+  }
   if (!fs::exists(fn)) {
     throw std::runtime_error("missing: " + std::string(resource));
   }
