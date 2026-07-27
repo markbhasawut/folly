@@ -7,7 +7,6 @@ shipit_fbcode_builder = true
 [git]
 repo_url = https://github.com/markbhasawut/folly.git
 branch = oss-fixes
-rev = 01bbc54b10baecd375fca40a1e4379ee256c3090
 
 [build]
 builder = cmake
