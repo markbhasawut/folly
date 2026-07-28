@@ -270,11 +270,12 @@ folly_create_monolithic_library()
 # Resolve deferred dependencies (must be after monolithic library is created)
 folly_resolve_deferred_dependencies()
 
-# Define FOLLY_CERTS_DIR for the granular test_util target
-# This points to the SSL test certificates used by TestSSLServer and related tests
-if(TARGET folly_testing_test_util)
-  target_compile_definitions(folly_testing_test_util INTERFACE
-    FOLLY_CERTS_DIR="${FOLLY_DIR}/io/async/test/certs"
+# Let find_resource() fall back to the configured installation when resources
+# are not copied beside a test executable. FOLLY_TEST_RESOURCE_ROOT can
+# override this path at runtime for staged or relocated installations.
+if(TARGET folly_testing_test_util_obj)
+  target_compile_definitions(folly_testing_test_util_obj PRIVATE
+    FOLLY_INSTALL_RESOURCE_ROOT="${CMAKE_INSTALL_PREFIX}/share"
   )
 endif()
 
@@ -284,9 +285,6 @@ set(FOLLY_INSTALL_TARGETS folly folly_deps)
 add_library(folly_test_util
   ${FOLLY_DIR}/test/DeterministicSchedule.cpp
   ${FOLLY_DIR}/json/JsonTestUtil.cpp
-)
-target_compile_definitions(folly_test_util PUBLIC
-  FOLLY_CERTS_DIR="${FOLLY_DIR}/io/async/test/certs"
 )
 set_property(TARGET folly_test_util PROPERTY VERSION ${PACKAGE_VERSION})
 target_link_libraries(folly_test_util
@@ -316,6 +314,10 @@ install(
 # downstream projects that use on folly can easily depend on it in their CMake
 # files using "find_package(folly CONFIG)"
 include(CMakePackageConfigHelpers)
+set(FOLLY_HAVE_TEST_SUPPORT_PACKAGE FALSE)
+if(BUILD_TESTS OR BUILD_BENCHMARKS)
+  set(FOLLY_HAVE_TEST_SUPPORT_PACKAGE TRUE)
+endif()
 configure_package_config_file(
   CMake/folly-config.cmake.in
   folly-config.cmake
@@ -458,13 +460,10 @@ if (BUILD_TESTS OR BUILD_BENCHMARKS)
       glog::glog
   )
   apply_folly_compile_options_to_target(folly_test_support)
-  target_compile_definitions(folly_test_support PRIVATE
-    FOLLY_CERTS_DIR="${CMAKE_INSTALL_PREFIX}/share/folly/io/async/test/certs"
-  )
-
   # Downstream projects use Folly's socket and TLS test helpers too. Install
   # their implementation and data when tests are explicitly enabled.
   install(TARGETS folly_test_support
+    EXPORT folly
     RUNTIME DESTINATION bin
     LIBRARY DESTINATION ${LIB_INSTALL_DIR}
     ARCHIVE DESTINATION ${LIB_INSTALL_DIR}

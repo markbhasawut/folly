@@ -19,6 +19,8 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include <cstdlib>
+
 #include <glog/logging.h>
 
 #include <folly/Exception.h>
@@ -241,10 +243,24 @@ fs::path find_resource(std::string_view resource) {
   auto const resourcePath = fs::path(std::string(resource));
   auto fn = resourcePath;
   if (!resourcePath.is_absolute()) {
-    fn = ext
-        ? fs::path(ext(resource)) // hooked, eg via internal extension
-        : fs::executable_path().parent_path() /
+    fn = ext ? fs::path(ext(resource)) // hooked, eg via internal extension
+             : fs::executable_path().parent_path() /
             resourcePath; // current cmake build
+  }
+  if (!fs::exists(fn) && !resourcePath.is_absolute()) {
+    if (const auto* root = std::getenv("FOLLY_TEST_RESOURCE_ROOT");
+        root != nullptr && *root != '\0') {
+      auto candidate = fs::path(root) / resourcePath;
+      if (fs::exists(candidate)) {
+        return candidate;
+      }
+    }
+#if defined(FOLLY_INSTALL_RESOURCE_ROOT)
+    auto candidate = fs::path(FOLLY_INSTALL_RESOURCE_ROOT) / resourcePath;
+    if (fs::exists(candidate)) {
+      return candidate;
+    }
+#endif
   }
   if (!fs::exists(fn)) {
     throw std::runtime_error("missing: " + std::string(resource));

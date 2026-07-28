@@ -35,6 +35,13 @@ if(NOT TARGET glog::glog)
   find_package(Glog QUIET)
 endif()
 
+# folly_test_support is exported only when Folly is configured with tests or
+# benchmarks. Recreate the GTest targets in its public link interface before
+# loading folly-targets.cmake.
+if(@FOLLY_HAVE_TEST_SUPPORT_PACKAGE@ AND NOT TARGET GTest::gmock)
+  find_dependency(GTest)
+endif()
+
 # Include the folly-targets.cmake file, which is generated from our CMake rules
 if (NOT TARGET Folly::folly)
   include("${FOLLY_CMAKE_DIR}/folly-targets.cmake")

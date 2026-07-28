@@ -259,6 +259,8 @@ class CaptureFD {
 //  find_resource
 //
 //  Finds the file path of a resource which was built alongside a test binary.
+//  FOLLY_TEST_RESOURCE_ROOT may point to an alternate resource tree for
+//  staged or relocated installations.
 //
 //  Care must be taken to set up the test and resource build rules in accordance
 //  with this function.
