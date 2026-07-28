@@ -29,8 +29,19 @@
 #define FOLLY_DETAIL_GEN_BASE_HAS_RANGEV3 __has_include(<range/v3/version.hpp>)
 
 #if FOLLY_DETAIL_GEN_BASE_HAS_RANGEV3
+#if defined(__APPLE__) && !defined(META_NO_STD_FORWARD_DECLARATIONS)
+// range-v3's bundled meta library emits libc++ forward declarations on Apple.
+// Those declarations conflict with Boost.Container's declarations when both
+// libraries are used in the same translation unit.
+#define META_NO_STD_FORWARD_DECLARATIONS 1
+#define FOLLY_DETAIL_GEN_BASE_UNDEF_META_NO_STD_FORWARD_DECLARATIONS 1
+#endif
 #include <range/v3/view/filter.hpp>
 #include <range/v3/view/transform.hpp>
+#if defined(FOLLY_DETAIL_GEN_BASE_UNDEF_META_NO_STD_FORWARD_DECLARATIONS)
+#undef FOLLY_DETAIL_GEN_BASE_UNDEF_META_NO_STD_FORWARD_DECLARATIONS
+#undef META_NO_STD_FORWARD_DECLARATIONS
+#endif
 #endif
 
 // Ignore shadowing warnings within this file, so includers can use -Wshadow.
