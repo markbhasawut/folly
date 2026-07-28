@@ -38,11 +38,55 @@ if(Jemalloc_INCLUDE_DIR)
   )
 endif()
 
+if(Jemalloc_INCLUDE_DIR AND Jemalloc_LIBRARY)
+  include(CheckCXXSourceCompiles)
+
+  set(_jemalloc_saved_required_includes "${CMAKE_REQUIRED_INCLUDES}")
+  set(_jemalloc_saved_required_libraries "${CMAKE_REQUIRED_LIBRARIES}")
+  set(CMAKE_REQUIRED_INCLUDES "${Jemalloc_INCLUDE_DIR}")
+  set(CMAKE_REQUIRED_LIBRARIES "${Jemalloc_LIBRARY}")
+
+  # Folly calls jemalloc's public allocation API directly. On macOS, jemalloc
+  # defaults to a je_ prefix unless configured with --with-jemalloc-prefix=.
+  # Finding a library named libjemalloc is therefore insufficient: reject an
+  # ABI that would leave mallocx, nallocx, dallocx, and mallctl unavailable.
+  unset(Jemalloc_HAS_UNPREFIXED_API CACHE)
+  check_cxx_source_compiles(
+    [[
+      #include <cstddef>
+      #include <jemalloc/jemalloc.h>
+
+      int main() {
+        void* allocation = mallocx(8, MALLOCX_ZERO);
+        const std::size_t capacity = nallocx(8, 0);
+        dallocx(allocation, 0);
+
+        const char* version = nullptr;
+        std::size_t version_size = sizeof(version);
+        const int error =
+            mallctl("version", &version, &version_size, nullptr, 0);
+        return error != 0 || capacity < 8;
+      }
+    ]]
+    Jemalloc_HAS_UNPREFIXED_API
+  )
+
+  set(CMAKE_REQUIRED_INCLUDES "${_jemalloc_saved_required_includes}")
+  set(CMAKE_REQUIRED_LIBRARIES "${_jemalloc_saved_required_libraries}")
+  unset(_jemalloc_saved_required_includes)
+  unset(_jemalloc_saved_required_libraries)
+endif()
+
 include(FindPackageHandleStandardArgs)
 find_package_handle_standard_args(
   Jemalloc
-  REQUIRED_VARS Jemalloc_LIBRARY Jemalloc_INCLUDE_DIR
+  REQUIRED_VARS
+    Jemalloc_LIBRARY
+    Jemalloc_INCLUDE_DIR
+    Jemalloc_HAS_UNPREFIXED_API
   VERSION_VAR Jemalloc_VERSION
+  REASON_FAILURE_MESSAGE
+    "Folly requires an unprefixed jemalloc ABI. Configure jemalloc with --with-jemalloc-prefix="
 )
 
 if(Jemalloc_FOUND AND NOT TARGET Jemalloc::jemalloc)
@@ -60,4 +104,8 @@ set(JEMALLOC_FOUND "${Jemalloc_FOUND}")
 set(JEMALLOC_INCLUDE_DIR "${Jemalloc_INCLUDE_DIR}")
 set(JEMALLOC_LIBRARY "${Jemalloc_LIBRARY}")
 
-mark_as_advanced(Jemalloc_INCLUDE_DIR Jemalloc_LIBRARY)
+mark_as_advanced(
+  Jemalloc_INCLUDE_DIR
+  Jemalloc_LIBRARY
+  Jemalloc_HAS_UNPREFIXED_API
+)

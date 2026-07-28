@@ -131,6 +131,11 @@ elseif(NOT WIN32)
   if(Jemalloc_FOUND)
     set(FOLLY_USE_JEMALLOC TRUE)
     set(FOLLY_HAVE_JEMALLOC_PACKAGE TRUE)
+    # Keep the header selected by FindJemalloc ahead of umbrella prefixes
+    # such as Homebrew. The Python extension build translates this list into
+    # explicit -I flags, where a stale jemalloc header would otherwise win
+    # even though the linker uses Jemalloc_LIBRARY.
+    list(PREPEND FOLLY_INCLUDE_DIRECTORIES "${Jemalloc_INCLUDE_DIR}")
     list(APPEND FOLLY_LINK_LIBRARIES Jemalloc::jemalloc)
   elseif(FOLLY_JEMALLOC STREQUAL "ON")
     message(
