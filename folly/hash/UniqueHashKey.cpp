@@ -23,7 +23,7 @@
 #include <sys/auxv.h>
 #endif
 
-#if __has_include(<blake3.h>)
+#if FOLLY_HAVE_BLAKE3
 #include <blake3.h>
 #endif
 
@@ -84,7 +84,7 @@ unique_hash_key_algo_strong_sha256_init() {
   return object;
 }
 
-#if __has_include(<blake3.h>)
+#if FOLLY_HAVE_BLAKE3
 
 /// unique_hash_key_init_process_key_blake3
 ///
@@ -167,7 +167,7 @@ struct unique_hash_key_algo_fast_xxh3_ops<16> {
 
 #endif // __has_include(<xxh3.h>)
 
-#endif // __has_include(<blake3.h>)
+#endif // FOLLY_HAVE_BLAKE3
 
 template <typename Hash, typename Update>
 FOLLY_ALWAYS_INLINE static void unique_hash_key_hash_items(
@@ -218,7 +218,7 @@ template std::array<uint8_t, 32> //
 unique_hash_key_algo_strong_sha256_fn<32>::operator()(
     span<detail::unique_hash_key_item const> in) const noexcept;
 
-#if __has_include(<blake3.h>)
+#if FOLLY_HAVE_BLAKE3
 
 template <size_t Size>
 std::array<uint8_t, Size>
@@ -277,6 +277,6 @@ unique_hash_key_algo_fast_xxh3_fn<16>::operator()(
 
 #endif // __has_include(<xxh3.h>)
 
-#endif // __has_include(<blake3.h>)
+#endif // FOLLY_HAVE_BLAKE3
 
 } // namespace folly

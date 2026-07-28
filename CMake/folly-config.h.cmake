@@ -77,6 +77,7 @@
 #cmakedefine01 FOLLY_HAVE_LIBZ
 #cmakedefine01 FOLLY_HAVE_LIBZSTD
 #cmakedefine01 FOLLY_HAVE_LIBBZ2
+#cmakedefine01 FOLLY_HAVE_BLAKE3
 
 #cmakedefine01 FOLLY_LIBRARY_SANITIZE_ADDRESS
 

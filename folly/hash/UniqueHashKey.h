@@ -27,6 +27,10 @@
 
 #include <folly/container/span.h>
 
+#ifndef FOLLY_HAVE_BLAKE3
+#define FOLLY_HAVE_BLAKE3 __has_include(<blake3.h>)
+#endif
+
 namespace folly {
 
 namespace detail {
@@ -64,7 +68,7 @@ template <size_t Size>
 inline constexpr unique_hash_key_algo_strong_sha256_fn<Size>
     unique_hash_key_algo_strong_sha256{};
 
-#if __has_include(<blake3.h>)
+#if FOLLY_HAVE_BLAKE3
 
 /// unique_hash_key_algo_strong_blake3_fn
 ///
@@ -108,7 +112,7 @@ inline constexpr unique_hash_key_algo_fast_xxh3_fn<Size>
 
 #endif // __has_include(<xxh3.h>)
 
-#endif // __has_include(<blake3.h>)
+#endif // FOLLY_HAVE_BLAKE3
 
 template <auto Algo>
 constexpr size_t unique_hash_key_algo_size_v =
@@ -253,7 +257,7 @@ template <size_t Size>
 using unique_hash_key_strong_sha256 =
     unique_hash_key_with<unique_hash_key_algo_strong_sha256<Size>>;
 
-#if __has_include(<blake3.h>)
+#if FOLLY_HAVE_BLAKE3
 
 /// unique_hash_key_strong_blake3
 ///
@@ -281,7 +285,7 @@ using unique_hash_key_fast_xxh3 =
 
 #endif // __has_include(<xxh3.h>)
 
-#endif // __has_include(<blake3.h>)
+#endif // FOLLY_HAVE_BLAKE3
 
 } // namespace folly
 

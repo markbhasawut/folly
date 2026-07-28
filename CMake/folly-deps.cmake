@@ -104,6 +104,51 @@ if (EXISTS "${GLOG_INCLUDE_DIR}/glog/export.h")
   list(APPEND FOLLY_CXX_FLAGS -DGLOG_USE_GLOG_EXPORT)
 endif()
 
+set(
+  FOLLY_JEMALLOC "AUTO"
+  CACHE STRING
+  "Use jemalloc: AUTO discovers it, ON requires it, and OFF disables it."
+)
+set_property(CACHE FOLLY_JEMALLOC PROPERTY STRINGS AUTO ON OFF)
+string(TOUPPER "${FOLLY_JEMALLOC}" FOLLY_JEMALLOC)
+if(NOT FOLLY_JEMALLOC MATCHES "^(AUTO|ON|OFF)$")
+  message(
+    FATAL_ERROR
+    "FOLLY_JEMALLOC must be AUTO, ON, or OFF; got '${FOLLY_JEMALLOC}'."
+  )
+endif()
+
+set(FOLLY_HAVE_JEMALLOC_PACKAGE FALSE)
+if(FOLLY_JEMALLOC STREQUAL "OFF")
+  set(FOLLY_USE_JEMALLOC FALSE)
+elseif(CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
+  check_include_file_cxx(malloc_np.h FOLLY_USE_JEMALLOC)
+  if(FOLLY_JEMALLOC STREQUAL "ON" AND NOT FOLLY_USE_JEMALLOC)
+    message(FATAL_ERROR "FOLLY_JEMALLOC=ON but malloc_np.h was not found.")
+  endif()
+elseif(NOT WIN32)
+  find_package(Jemalloc MODULE QUIET)
+  if(Jemalloc_FOUND)
+    set(FOLLY_USE_JEMALLOC TRUE)
+    set(FOLLY_HAVE_JEMALLOC_PACKAGE TRUE)
+    list(APPEND FOLLY_LINK_LIBRARIES Jemalloc::jemalloc)
+  elseif(FOLLY_JEMALLOC STREQUAL "ON")
+    message(
+      FATAL_ERROR
+      "FOLLY_JEMALLOC=ON but jemalloc headers and library were not found."
+    )
+  else()
+    set(FOLLY_USE_JEMALLOC FALSE)
+  endif()
+else()
+  set(FOLLY_USE_JEMALLOC FALSE)
+endif()
+message(
+  STATUS
+  "Setting FOLLY_USE_JEMALLOC: ${FOLLY_USE_JEMALLOC} "
+  "(policy: ${FOLLY_JEMALLOC})"
+)
+
 find_package(LibEvent MODULE REQUIRED)
 list(APPEND FOLLY_LINK_LIBRARIES ${LIBEVENT_LIB})
 list(APPEND FOLLY_INCLUDE_DIRECTORIES ${LIBEVENT_INCLUDE_DIR})
@@ -160,6 +205,13 @@ set(FOLLY_HAVE_LIBSNAPPY ${SNAPPY_FOUND})
 if (SNAPPY_FOUND)
   list(APPEND FOLLY_INCLUDE_DIRECTORIES ${SNAPPY_INCLUDE_DIR})
   list(APPEND FOLLY_LINK_LIBRARIES ${SNAPPY_LIBRARY})
+endif()
+
+find_package(blake3 CONFIG QUIET)
+set(FOLLY_HAVE_BLAKE3 FALSE)
+if(TARGET BLAKE3::blake3)
+  set(FOLLY_HAVE_BLAKE3 TRUE)
+  list(APPEND FOLLY_LINK_LIBRARIES BLAKE3::blake3)
 endif()
 
 find_package(LibDwarf)

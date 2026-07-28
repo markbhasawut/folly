@@ -330,6 +330,11 @@ install(
   COMPONENT dev
 )
 install(
+  FILES CMake/FindJemalloc.cmake
+  DESTINATION ${CMAKE_INSTALL_DIR}
+  COMPONENT dev
+)
+install(
   EXPORT folly
   DESTINATION ${CMAKE_INSTALL_DIR}
   NAMESPACE Folly::

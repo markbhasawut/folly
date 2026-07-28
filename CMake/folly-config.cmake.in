@@ -20,6 +20,16 @@ set_and_check(FOLLY_CMAKE_DIR "@PACKAGE_CMAKE_INSTALL_DIR@")
 # folly's prefix directory in the FOLLY_PREFIX_DIR variable
 set(FOLLY_PREFIX_DIR "${PACKAGE_PREFIX_DIR}")
 
+# Folly's exported interface carries Jemalloc::jemalloc when allocator support
+# was enabled. Recreate that imported target before loading folly-targets.cmake.
+if(@FOLLY_HAVE_JEMALLOC_PACKAGE@ AND NOT TARGET Jemalloc::jemalloc)
+  set(_folly_saved_cmake_module_path "${CMAKE_MODULE_PATH}")
+  set(CMAKE_MODULE_PATH "${FOLLY_CMAKE_DIR}" ${CMAKE_MODULE_PATH})
+  find_dependency(Jemalloc MODULE)
+  set(CMAKE_MODULE_PATH "${_folly_saved_cmake_module_path}")
+  unset(_folly_saved_cmake_module_path)
+endif()
+
 # Find glog before loading targets, since targets reference the glog::glog target
 if(NOT TARGET glog::glog)
   find_package(Glog QUIET)
@@ -35,6 +45,9 @@ set(FOLLY_LIBRARIES Folly::folly)
 
 # Find folly's dependencies
 find_dependency(fmt)
+if(@FOLLY_HAVE_BLAKE3@)
+  find_dependency(blake3 CONFIG)
+endif()
 
 set(Boost_USE_STATIC_LIBS "@FOLLY_BOOST_LINK_STATIC@")
 find_package(Boost 1.69.0 REQUIRED

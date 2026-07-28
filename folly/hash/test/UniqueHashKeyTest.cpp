@@ -74,7 +74,7 @@ INSTANTIATE_TYPED_TEST_SUITE_P(
     UniqueHashKeyTest,
     folly::unique_hash_key_algo_strong_sha256_fn<32>);
 
-#if __has_include(<blake3.h>)
+#if FOLLY_HAVE_BLAKE3
 
 INSTANTIATE_TYPED_TEST_SUITE_P(
     BLAKE3_8, //
@@ -106,4 +106,4 @@ INSTANTIATE_TYPED_TEST_SUITE_P(
 
 #endif // __has_include(<xxh3.h>)
 
-#endif // __has_include(<blake3.h>)
+#endif // FOLLY_HAVE_BLAKE3
