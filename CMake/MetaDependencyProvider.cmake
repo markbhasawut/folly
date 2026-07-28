@@ -199,6 +199,49 @@ function(_meta_path_is_under_prefix _output _path _prefix)
   endif()
 endfunction()
 
+function(
+  _meta_get_staged_dependency_candidate
+  _output
+  _dependency
+  _physical_prefix
+)
+  set("${_output}" "" PARENT_SCOPE)
+  if(NOT IS_ABSOLUTE "${_dependency}")
+    return()
+  endif()
+
+  get_filename_component(_dependency_library_dir "${_dependency}" DIRECTORY)
+  get_filename_component(_logical_prefix "${_dependency_library_dir}" DIRECTORY)
+  file(TO_CMAKE_PATH "${_logical_prefix}" _logical_prefix)
+  file(TO_CMAKE_PATH "${_physical_prefix}" _physical_prefix)
+  string(REGEX REPLACE "/+$" "" _logical_prefix "${_logical_prefix}")
+  string(REGEX REPLACE "/+$" "" _physical_prefix "${_physical_prefix}")
+
+  string(LENGTH "${_logical_prefix}" _logical_prefix_length)
+  string(LENGTH "${_physical_prefix}" _physical_prefix_length)
+  if(_physical_prefix_length LESS _logical_prefix_length)
+    return()
+  endif()
+
+  math(EXPR _suffix_position
+    "${_physical_prefix_length} - ${_logical_prefix_length}")
+  string(SUBSTRING
+    "${_physical_prefix}" "${_suffix_position}" -1 _physical_suffix)
+  if(NOT _physical_suffix STREQUAL _logical_prefix)
+    return()
+  endif()
+
+  file(RELATIVE_PATH
+    _dependency_relative_path "${_logical_prefix}" "${_dependency}")
+  if(_dependency_relative_path MATCHES "^\\.\\.")
+    return()
+  endif()
+  set(
+    "${_output}"
+    "${_physical_prefix}/${_dependency_relative_path}"
+    PARENT_SCOPE)
+endfunction()
+
 function(_meta_is_stack_dylib _output _path)
   get_filename_component(_name "${_path}" NAME)
   if(_name MATCHES
@@ -207,6 +250,29 @@ function(_meta_is_stack_dylib _output _path)
   else()
     set("${_output}" FALSE PARENT_SCOPE)
   endif()
+endfunction()
+
+function(
+  _meta_extract_absolute_macho_dependencies
+  _output
+  _otool_output
+  _install_name
+)
+  set(_dependencies)
+  string(REPLACE "\n" ";" _otool_lines "${_otool_output}")
+  foreach(_line IN LISTS _otool_lines)
+    string(STRIP "${_line}" _line)
+    if(NOT _line MATCHES "^(/[^ ]+)[ \t]+\\(compatibility version")
+      continue()
+    endif()
+
+    set(_dependency "${CMAKE_MATCH_1}")
+    if(_install_name AND _dependency STREQUAL _install_name)
+      continue()
+    endif()
+    list(APPEND _dependencies "${_dependency}")
+  endforeach()
+  set("${_output}" "${_dependencies}" PARENT_SCOPE)
 endfunction()
 
 function(_meta_validate_macho_dependencies _binary _prefix _package)
@@ -225,14 +291,31 @@ function(_meta_validate_macho_dependencies _binary _prefix _package)
       "${_package}: unable to inspect ${_binary} with otool:\n${_otool_error}")
   endif()
 
-  string(REPLACE "\n" ";" _otool_lines "${_otool_output}")
-  foreach(_line IN LISTS _otool_lines)
-    string(STRIP "${_line}" _line)
-    if(NOT _line MATCHES "^(/[^ ]+)[ \t]+\\(compatibility version")
-      continue()
+  # A dylib's first otool -L entry is its LC_ID_DYLIB install name, not a
+  # dependency. DESTDIR staging intentionally preserves the final install name,
+  # so comparing that identity with the staging prefix is a false positive.
+  set(_install_name "")
+  execute_process(
+    COMMAND /usr/bin/otool -D "${_binary}"
+    RESULT_VARIABLE _otool_id_result
+    OUTPUT_VARIABLE _otool_id_output
+    ERROR_QUIET
+  )
+  if(_otool_id_result EQUAL 0)
+    string(REPLACE "\n" ";" _otool_id_lines "${_otool_id_output}")
+    list(LENGTH _otool_id_lines _otool_id_line_count)
+    if(_otool_id_line_count GREATER 1)
+      list(GET _otool_id_lines 1 _install_name)
+      string(STRIP "${_install_name}" _install_name)
+      if(NOT _install_name MATCHES "^(/|@)")
+        set(_install_name "")
+      endif()
     endif()
+  endif()
 
-    set(_dependency "${CMAKE_MATCH_1}")
+  _meta_extract_absolute_macho_dependencies(
+    _dependencies "${_otool_output}" "${_install_name}")
+  foreach(_dependency IN LISTS _dependencies)
     _meta_is_stack_dylib(_is_meta_stack_dylib "${_dependency}")
     if(NOT _is_meta_stack_dylib)
       continue()
@@ -240,6 +323,13 @@ function(_meta_validate_macho_dependencies _binary _prefix _package)
 
     _meta_path_is_under_prefix(
       _dependency_matches_prefix "${_dependency}" "${_prefix}")
+    if(NOT _dependency_matches_prefix)
+      _meta_get_staged_dependency_candidate(
+        _staged_dependency "${_dependency}" "${_prefix}")
+      if(_staged_dependency AND EXISTS "${_staged_dependency}")
+        set(_dependency_matches_prefix TRUE)
+      endif()
+    endif()
     if(NOT _dependency_matches_prefix)
       message(FATAL_ERROR
         "${_package}: mixed Meta dependency providers detected.\n"

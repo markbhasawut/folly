@@ -616,6 +616,19 @@ if (BUILD_TESTS OR BUILD_BENCHMARKS)
     set(HAVE_CMAKE_GTEST OFF)
   endif()
 
+  if(BUILD_TESTS)
+    add_test(
+      NAME cmake_meta_dependency_provider_macho_identity
+      COMMAND
+        "${CMAKE_COMMAND}" -P
+        "${CMAKE_CURRENT_SOURCE_DIR}/CMake/tests/MetaDependencyProviderTest.cmake"
+    )
+    set_tests_properties(
+      cmake_meta_dependency_provider_macho_identity
+      PROPERTIES LABELS cmake
+    )
+  endif()
+
   # The ThreadLocalTest code uses a helper shared library for one of its tests.
   # This can only be built if folly itself was built as a shared library.
   if (BUILD_SHARED_LIBS)
