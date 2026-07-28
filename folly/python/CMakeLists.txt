@@ -170,9 +170,7 @@ if(APPLE)
   string(
     CONCAT DEFAULT_SETUP_LDFLAGS
     "-Wl,-rpath,${CMAKE_INSTALL_PREFIX}/${LIB_INSTALL_DIR} "
-    "-Wl,-undefined,dynamic_lookup "
-    "-Wl,-rpath,${CMAKE_CURRENT_BINARY_DIR} "
-    "-Wl,-rpath,${CMAKE_BINARY_DIR}"
+    "-Wl,-undefined,dynamic_lookup"
   )
 else()
   string(
@@ -291,11 +289,20 @@ target_include_directories(
 
 target_link_libraries(
   folly_python_cpp
-  PRIVATE
-    Python3::Python
   PUBLIC
     folly
 )
+
+if (APPLE)
+  # Python extension support libraries resolve the CPython ABI from the
+  # interpreter process. Linking libpython makes wheel repair tools bundle a
+  # second runtime, which is not safe to initialize in the same process.
+  target_link_libraries(folly_python_cpp PRIVATE Python3::Module)
+  target_link_options(
+    folly_python_cpp PRIVATE "LINKER:-undefined,dynamic_lookup")
+else()
+  target_link_libraries(folly_python_cpp PRIVATE Python3::Python)
+endif()
 
 add_dependencies(
   folly_python_cpp
@@ -327,6 +334,19 @@ add_custom_target(
     folly_python_api_headers
 )
 
+set(
+  SETUP_BUILD_ENV
+  "CC=${CMAKE_C_COMPILER}"
+  "CXX=${CMAKE_CXX_COMPILER}"
+  "LDFLAGS=${SETUP_LDFLAGS}"
+)
+if(APPLE AND CMAKE_OSX_DEPLOYMENT_TARGET)
+  list(
+    APPEND SETUP_BUILD_ENV
+    "MACOSX_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET}"
+  )
+endif()
+
 add_custom_command(
   TARGET folly_python_bindings
   POST_BUILD
@@ -335,9 +355,7 @@ add_custom_command(
   # from the CMake targets.
   COMMAND
     "${CMAKE_COMMAND}" -E env
-    "CC=${CMAKE_C_COMPILER}"
-    "CXX=${CMAKE_CXX_COMPILER}"
-    "LDFLAGS=${SETUP_LDFLAGS}"
+    ${SETUP_BUILD_ENV}
     ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/setup.py" build_ext
     -f ${incs} ${libs}
 
@@ -348,9 +366,7 @@ add_custom_command(
 
   COMMAND
     "${CMAKE_COMMAND}" -E env
-    "CC=${CMAKE_C_COMPILER}"
-    "CXX=${CMAKE_CXX_COMPILER}"
-    "LDFLAGS=${SETUP_LDFLAGS}"
+    ${SETUP_BUILD_ENV}
     ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/setup.py" bdist_wheel
 
   WORKING_DIRECTORY "${_cybld}"
