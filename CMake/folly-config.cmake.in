@@ -22,6 +22,13 @@ set_and_check(
 # find_dependency() ends up changing PACKAGE_PREFIX_DIR, so save
 # folly's prefix directory in the FOLLY_PREFIX_DIR variable
 set(FOLLY_PREFIX_DIR "${PACKAGE_PREFIX_DIR}")
+set(FOLLY_HAVE_RUST_BINDINGS "@FOLLY_HAVE_RUST_BINDINGS@")
+set(FOLLY_RUST_TOOLCHAIN "@FOLLY_RUST_TOOLCHAIN@")
+if(FOLLY_HAVE_RUST_BINDINGS)
+  set_and_check(
+    FOLLY_RUST_WORKSPACE_DIR
+    "${FOLLY_PREFIX_DIR}/@CMAKE_INSTALL_DATADIR@/folly/rust")
+endif()
 
 # Folly's exported interface carries Jemalloc::jemalloc when allocator support
 # was enabled. Recreate that imported target before loading folly-targets.cmake.

@@ -84,6 +84,15 @@ option(PYTHON_EXTENSIONS
   "Build Python Bindings for Folly, requires Cython and (BUILD_SHARED_LIBS=ON)"
   OFF
 )
+option(FOLLY_BUILD_RUST_BINDINGS
+  "Build and validate the Cargo workspace under folly/rust"
+  OFF
+)
+set(FOLLY_RUST_TOOLCHAIN "nightly-2026-05-22" CACHE STRING
+  "Rustup toolchain used for Folly's Rust bindings")
+set(FOLLY_RUST_CARGO_PROFILE "release" CACHE STRING
+  "Cargo profile used for Folly's Rust bindings: debug or release")
+set_property(CACHE FOLLY_RUST_CARGO_PROFILE PROPERTY STRINGS debug release)
 # Python extensions require shared libraries for proper symbol resolution
 if (PYTHON_EXTENSIONS)
   set(Python3_FIND_VIRTUALENV FIRST)
@@ -407,6 +416,14 @@ gen_pkgconfig_vars(FOLLY_PKGCONFIG folly_deps)
 set(CMAKE_REQUIRED_FLAGS "${_folly_saved_cmake_required_flags}")
 unset(_folly_saved_cmake_required_flags)
 
+# Rust bridge translation units inline allocator helpers from Folly headers.
+# Keep the allocator in pkg-config's public closure so Cargo build scripts do
+# not link libfolly while leaving mallctl unresolved.
+set(FOLLY_PKGCONFIG_PUBLIC_LIBS "")
+if(FOLLY_HAVE_JEMALLOC_PACKAGE)
+  string(APPEND FOLLY_PKGCONFIG_PUBLIC_LIBS " -ljemalloc")
+endif()
+
 if(FOLLY_CXX_RUNTIME_INSTALL_COMPILE_OPTIONS)
   string(JOIN
     " "
@@ -527,6 +544,7 @@ set(FOLLY_HAVE_TEST_SUPPORT_PACKAGE FALSE)
 if(BUILD_TESTS OR BUILD_BENCHMARKS)
   set(FOLLY_HAVE_TEST_SUPPORT_PACKAGE TRUE)
 endif()
+set(FOLLY_HAVE_RUST_BINDINGS "${FOLLY_BUILD_RUST_BINDINGS}")
 configure_package_config_file(
   CMake/folly-config.cmake.in
   folly-config.cmake
@@ -1307,4 +1325,9 @@ if (BUILD_TESTS OR BUILD_BENCHMARKS)
         TEST singleton_thread_local_test SOURCES SingletonThreadLocalTest.cpp
     )
   endif()
+endif()
+
+if(FOLLY_BUILD_RUST_BINDINGS)
+  include(FollyRust)
+  folly_enable_rust_bindings()
 endif()

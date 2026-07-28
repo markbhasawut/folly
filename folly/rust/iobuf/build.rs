@@ -1,23 +1,16 @@
-use std::path::PathBuf;
-
-fn probe_includes(name: &str) -> Vec<PathBuf> {
-    pkg_config::probe_library(name)
-        .map(|lib| lib.include_paths)
-        .unwrap_or_default()
-}
+#[path = "../build_support.rs"]
+mod build_support;
 
 fn main() {
     println!("cargo::rustc-check-cfg=cfg(fbcode_build)");
 
-    let fmt_includes = probe_includes("fmt");
-    let folly_includes = probe_includes("libfolly");
+    let folly_includes = build_support::folly_includes();
+    let fmt_includes = build_support::probe_includes("fmt");
 
     let mut build = cxx_build::bridge("src/lib.rs");
-    build
-        .file("iobuf.cpp")
-        .include("../../..");
+    build.file("iobuf.cpp").include("../../..");
 
-    for path in fmt_includes.iter().chain(folly_includes.iter()) {
+    for path in folly_includes.iter().chain(fmt_includes.iter()) {
         if !path.to_string_lossy().contains("/usr/include") {
             build.include(path);
         }
@@ -30,7 +23,5 @@ fn main() {
         build.flag_if_supported("-std=c++20");
     }
 
-    build
-        .define("GLOG_USE_GLOG_EXPORT", None)
-        .compile("iobuf");
+    build.define("GLOG_USE_GLOG_EXPORT", None).compile("iobuf");
 }

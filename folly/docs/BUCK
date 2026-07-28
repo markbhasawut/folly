@@ -81,6 +81,12 @@ fb_dirsync_rule(
 )
 
 fb_dirsync_rule(
+    name = "Rust.html",
+    src = "Rust.md",
+    fbcode_rule = html,
+)
+
+fb_dirsync_rule(
     name = "SmallLocks.html",
     src = "SmallLocks.md",
     fbcode_rule = html,

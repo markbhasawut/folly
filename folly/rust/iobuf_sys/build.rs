@@ -3,6 +3,9 @@ use std::collections::HashSet;
 use std::env;
 use std::path::PathBuf;
 
+#[path = "../build_support.rs"]
+mod build_support;
+
 // Workaround for https://github.com/rust-lang/rust-bindgen/issues/687
 const IGNORE_MACROS: [&str; 10] = [
     "FP_INFINITE",
@@ -36,32 +39,25 @@ impl IgnoreMacros {
     }
 }
 
-fn probe_includes(name: &str) -> Vec<PathBuf> {
-    pkg_config::probe_library(name)
-        .map(|lib| lib.include_paths)
-        .unwrap_or_default()
-}
-
 fn main() {
-    let gflags_includes = probe_includes("gflags");
-    let fmt_includes = probe_includes("fmt");
-    let folly_includes = probe_includes("libfolly");
-    let glog_includes = probe_includes("libglog");
+    let folly_includes = build_support::folly_includes();
+    let gflags_includes = build_support::probe_includes("gflags");
+    let fmt_includes = build_support::probe_includes("fmt");
+    let glog_includes = build_support::probe_includes("libglog");
 
     let mut builder = bindgen::Builder::default()
         .header("../iobuf/iobuf.h")
         .parse_callbacks(Box::new(IgnoreMacros::new()))
         .with_codegen_config(
-            bindgen::CodegenConfig::TYPES |
-            bindgen::CodegenConfig::FUNCTIONS |
-            bindgen::CodegenConfig::VARS
+            bindgen::CodegenConfig::TYPES
+                | bindgen::CodegenConfig::FUNCTIONS
+                | bindgen::CodegenConfig::VARS,
         )
         .clang_arg("-x")
         .clang_arg("c++")
         .clang_arg("-DGLOG_USE_GLOG_EXPORT")
         .enable_cxx_namespaces()
         .generate_comments(false)
-
         .allowlist_function("facebook::rust::.*")
         .allowlist_function(".*iobuf.*")
         .allowlist_type("folly::IOBuf.*")
@@ -70,10 +66,8 @@ fn main() {
         .blocklist_type("folly::fbvector.*")
         .blocklist_type("__type")
         .blocklist_type("type_")
-
         .opaque_type("(::)?std::.*")
         .opaque_type("folly::fbstring.*")
-
         .clang_arg("-I../../..");
 
     if cfg!(target_os = "windows") {
@@ -85,36 +79,14 @@ fn main() {
         builder = builder.clang_arg("-std=c++20");
     }
 
-    if cfg!(target_os = "macos") {
-        if let Ok(output) = std::process::Command::new("xcrun").arg("--show-sdk-path").output() {
-            let sdk = String::from_utf8_lossy(&output.stdout).trim().to_string();
-            if !sdk.is_empty() {
-                builder = builder
-                    .clang_arg("-isystem")
-                    .clang_arg(format!("{}/usr/include/c++/v1", sdk));
-            }
-        }
-        if let Ok(output) = std::process::Command::new("clang").arg("-print-resource-dir").output() {
-            let res_dir = String::from_utf8_lossy(&output.stdout).trim().to_string();
-            if !res_dir.is_empty() {
-                builder = builder
-                    .clang_arg("-isystem")
-                    .clang_arg(format!("{}/include", res_dir));
-            }
-        }
-        if let Ok(output) = std::process::Command::new("xcrun").arg("--show-sdk-path").output() {
-            let sdk = String::from_utf8_lossy(&output.stdout).trim().to_string();
-            if !sdk.is_empty() {
-                builder = builder
-                    .clang_arg("-isystem")
-                    .clang_arg(format!("{}/usr/include", sdk));
-            }
-        }
+    for arg in build_support::bindgen_clang_args() {
+        builder = builder.clang_arg(arg);
     }
 
-    for path in gflags_includes.iter()
+    for path in folly_includes
+        .iter()
+        .chain(gflags_includes.iter())
         .chain(fmt_includes.iter())
-        .chain(folly_includes.iter())
         .chain(glog_includes.iter())
     {
         if !path.to_string_lossy().contains("/usr/include") {
@@ -122,14 +94,11 @@ fn main() {
         }
     }
 
-    let bindings = builder
-        .generate()
-        .expect("Unable to generate bindings");
+    let bindings = builder.generate().expect("Unable to generate bindings");
 
     let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
     let out_file = out_path.join("bindings.rs");
-    std::fs::create_dir_all(&out_path)
-        .expect("Couldn't create output directory for bindings");
+    std::fs::create_dir_all(&out_path).expect("Couldn't create output directory for bindings");
     bindings
         .write_to_file(&out_file)
         .expect("Couldn't write bindings!");

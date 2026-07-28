@@ -1,21 +1,14 @@
-use std::path::PathBuf;
-
-fn probe_includes(name: &str) -> Vec<PathBuf> {
-    pkg_config::probe_library(name)
-        .map(|lib| lib.include_paths)
-        .unwrap_or_default()
-}
+#[path = "../build_support.rs"]
+mod build_support;
 
 fn main() {
-    let fmt_includes = probe_includes("fmt");
-    let folly_includes = probe_includes("libfolly");
+    let folly_includes = build_support::folly_includes();
+    let fmt_includes = build_support::probe_includes("fmt");
 
     let mut build = cxx_build::bridge("lib.rs");
-    build
-        .file("singleton.cpp")
-        .include("../../..");
+    build.file("singleton.cpp").include("../../..");
 
-    for path in fmt_includes.iter().chain(folly_includes.iter()) {
+    for path in folly_includes.iter().chain(fmt_includes.iter()) {
         if !path.to_string_lossy().contains("/usr/include") {
             build.include(path);
         }
