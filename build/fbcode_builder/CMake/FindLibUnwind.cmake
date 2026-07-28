@@ -14,14 +14,23 @@
 
 include(FindPackageHandleStandardArgs)
 
-# Prefer pkg-config: picks up transitive deps (e.g. lzma, zlib) that
-# static libunwind needs but a bare find_library would miss.
-find_package(PkgConfig QUIET)
-if(PKG_CONFIG_FOUND)
-  pkg_check_modules(PC_LIBUNWIND QUIET libunwind)
+if(FOLLY_LIBUNWIND_INCLUDE_HINT AND FOLLY_LIBUNWIND_LIBRARY_HINT)
+  # Folly's macOS runtime provider has already selected a matched runtime.
+  # Do not let pkg-config or a broad prefix search mix Apple and LLVM pieces.
+  set(LIBUNWIND_INCLUDE_DIR "${FOLLY_LIBUNWIND_INCLUDE_HINT}")
+  set(LIBUNWIND_LIBRARY "${FOLLY_LIBUNWIND_LIBRARY_HINT}")
+  FIND_PACKAGE_HANDLE_STANDARD_ARGS(LibUnwind
+    REQUIRED_VARS LIBUNWIND_LIBRARY LIBUNWIND_INCLUDE_DIR)
+else()
+  # Prefer pkg-config: picks up transitive deps (e.g. lzma, zlib) that
+  # static libunwind needs but a bare find_library would miss.
+  find_package(PkgConfig QUIET)
+  if(PKG_CONFIG_FOUND)
+    pkg_check_modules(PC_LIBUNWIND QUIET libunwind)
+  endif()
 endif()
 
-if(PC_LIBUNWIND_FOUND)
+if(NOT LibUnwind_FOUND AND PC_LIBUNWIND_FOUND)
   find_path(LIBUNWIND_INCLUDE_DIR NAMES libunwind.h
     HINTS ${PC_LIBUNWIND_INCLUDE_DIRS}
     PATH_SUFFIXES libunwind)
@@ -46,14 +55,25 @@ if(PC_LIBUNWIND_FOUND)
 
   FIND_PACKAGE_HANDLE_STANDARD_ARGS(LibUnwind
     REQUIRED_VARS LIBUNWIND_LIBRARIES LIBUNWIND_INCLUDE_DIR)
-else()
+elseif(NOT LibUnwind_FOUND)
   # Fallback for systems without pkg-config.
   # When using prepackaged LLVM libunwind on Ubuntu, its includes are
   # installed in a subdirectory.
   find_path(LIBUNWIND_INCLUDE_DIR NAMES libunwind.h PATH_SUFFIXES libunwind)
   mark_as_advanced(LIBUNWIND_INCLUDE_DIR)
 
-  find_library(LIBUNWIND_LIBRARY NAMES unwind)
+  # Apple ships libunwind as part of the platform runtime. Its SDK stub lives
+  # below usr/lib/system rather than the ordinary usr/lib search directory, so
+  # a plain find_library() misses it. Prefer the stub from the selected SDK to
+  # keep libc++, libc++abi, and libunwind on the same Apple runtime provider.
+  if(APPLE AND IS_ABSOLUTE "${CMAKE_OSX_SYSROOT}")
+    find_library(LIBUNWIND_LIBRARY NAMES unwind
+      PATHS "${CMAKE_OSX_SYSROOT}/usr/lib/system"
+      NO_DEFAULT_PATH)
+  endif()
+  if(NOT LIBUNWIND_LIBRARY)
+    find_library(LIBUNWIND_LIBRARY NAMES unwind)
+  endif()
   mark_as_advanced(LIBUNWIND_LIBRARY)
 
   FIND_PACKAGE_HANDLE_STANDARD_ARGS(LibUnwind

@@ -50,6 +50,28 @@ if (NOT TARGET Folly::folly)
   include("${FOLLY_CMAKE_DIR}/folly-targets.cmake")
 endif()
 
+# Imported targets are treated as system dependencies by default. On macOS,
+# that can put a Homebrew umbrella include directory ahead of the selected
+# Folly prefix and silently combine Homebrew headers with /usr/local binaries.
+# Keep every exported Folly target in the normal include search tier so the
+# provider selected by find_package(folly) wins before unrelated system
+# dependency prefixes.
+get_property(_folly_imported_targets DIRECTORY PROPERTY IMPORTED_TARGETS)
+foreach(_folly_imported_target IN LISTS _folly_imported_targets)
+  if(_folly_imported_target MATCHES "^Folly::")
+    set_property(
+      TARGET "${_folly_imported_target}"
+      PROPERTY IMPORTED_NO_SYSTEM TRUE
+    )
+    set_property(
+      TARGET "${_folly_imported_target}"
+      PROPERTY SYSTEM FALSE
+    )
+  endif()
+endforeach()
+unset(_folly_imported_target)
+unset(_folly_imported_targets)
+
 include("${FOLLY_DEPENDENCY_PROVIDER_MODULE}")
 if(TARGET Jemalloc::jemalloc)
   meta_validate_dependency_provider(

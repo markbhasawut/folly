@@ -109,6 +109,144 @@ if(NOT CMAKE_CXX_STANDARD)
   message(STATUS "setting C++ standard to C++${CMAKE_CXX_STANDARD}")
 endif()
 
+if(APPLE AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+  set(
+    FOLLY_CXX_RUNTIME_PROVIDER
+    "APPLE"
+    CACHE STRING
+    "C++ runtime used with upstream LLVM Clang on macOS: APPLE or LLVM"
+  )
+  set_property(
+    CACHE FOLLY_CXX_RUNTIME_PROVIDER
+    PROPERTY STRINGS APPLE LLVM
+  )
+  string(TOUPPER
+    "${FOLLY_CXX_RUNTIME_PROVIDER}"
+    _folly_cxx_runtime_provider
+  )
+  if(NOT _folly_cxx_runtime_provider MATCHES "^(APPLE|LLVM)$")
+    message(FATAL_ERROR
+      "FOLLY_CXX_RUNTIME_PROVIDER must be APPLE or LLVM, not "
+      "'${FOLLY_CXX_RUNTIME_PROVIDER}'")
+  endif()
+
+  if(NOT IS_ABSOLUTE "${CMAKE_OSX_SYSROOT}")
+    message(FATAL_ERROR
+      "FOLLY_CXX_RUNTIME_PROVIDER requires CMAKE_OSX_SYSROOT to be an "
+      "absolute Apple SDK path")
+  endif()
+
+  if(_folly_cxx_runtime_provider STREQUAL "APPLE")
+    set(
+      FOLLY_CXX_RUNTIME_INCLUDE
+      "${CMAKE_OSX_SYSROOT}/usr/include/c++/v1"
+    )
+    set(
+      FOLLY_LIBUNWIND_INCLUDE_HINT
+      "${CMAKE_OSX_SYSROOT}/usr/include"
+    )
+    set(
+      FOLLY_LIBUNWIND_LIBRARY_HINT
+      "${CMAKE_OSX_SYSROOT}/usr/lib/system/libunwind.tbd"
+    )
+    set(_folly_runtime_required_paths
+      "${FOLLY_CXX_RUNTIME_INCLUDE}/__config"
+      "${FOLLY_LIBUNWIND_INCLUDE_HINT}/libunwind.h"
+      "${FOLLY_LIBUNWIND_LIBRARY_HINT}"
+    )
+  else()
+    get_filename_component(
+      _folly_llvm_bin_dir "${CMAKE_CXX_COMPILER}" DIRECTORY)
+    get_filename_component(
+      _folly_llvm_root_default "${_folly_llvm_bin_dir}" DIRECTORY)
+    set(
+      FOLLY_LLVM_ROOT
+      "${_folly_llvm_root_default}"
+      CACHE PATH
+      "LLVM installation containing libc++, libc++abi, and libunwind"
+    )
+
+    set(
+      FOLLY_CXX_RUNTIME_INCLUDE
+      "${FOLLY_LLVM_ROOT}/include/c++/v1"
+    )
+    set(
+      FOLLY_LLVM_LIBCXX_LIBRARY_DIR
+      "${FOLLY_LLVM_ROOT}/lib/c++"
+    )
+    set(
+      FOLLY_LLVM_LIBUNWIND_LIBRARY_DIR
+      "${FOLLY_LLVM_ROOT}/lib/unwind"
+    )
+    set(
+      FOLLY_LIBUNWIND_INCLUDE_HINT
+      "${FOLLY_LLVM_ROOT}/include"
+    )
+    set(
+      FOLLY_LIBUNWIND_LIBRARY_HINT
+      "${FOLLY_LLVM_LIBUNWIND_LIBRARY_DIR}/libunwind.dylib"
+    )
+    set(_folly_runtime_required_paths
+      "${FOLLY_CXX_RUNTIME_INCLUDE}/__config"
+      "${FOLLY_LIBUNWIND_INCLUDE_HINT}/libunwind.h"
+      "${FOLLY_LLVM_LIBCXX_LIBRARY_DIR}/libc++.dylib"
+      "${FOLLY_LLVM_LIBCXX_LIBRARY_DIR}/libc++abi.dylib"
+      "${FOLLY_LIBUNWIND_LIBRARY_HINT}"
+    )
+
+    set(FOLLY_CXX_RUNTIME_LINK_FLAGS
+      "-L${FOLLY_LLVM_LIBCXX_LIBRARY_DIR}"
+      "-L${FOLLY_LLVM_LIBUNWIND_LIBRARY_DIR}"
+      "-Wl,-rpath,${FOLLY_LLVM_LIBCXX_LIBRARY_DIR}"
+      "-Wl,-rpath,${FOLLY_LLVM_LIBUNWIND_LIBRARY_DIR}"
+    )
+    set(FOLLY_CXX_RUNTIME_INSTALL_COMPILE_OPTIONS
+      "-nostdinc++"
+      "-isystem"
+      "${FOLLY_CXX_RUNTIME_INCLUDE}"
+    )
+    set(FOLLY_CXX_RUNTIME_INSTALL_LINK_OPTIONS
+      ${FOLLY_CXX_RUNTIME_LINK_FLAGS}
+    )
+    add_link_options(${FOLLY_CXX_RUNTIME_LINK_FLAGS})
+    list(APPEND
+      CMAKE_REQUIRED_LINK_OPTIONS
+      ${FOLLY_CXX_RUNTIME_LINK_FLAGS}
+    )
+  endif()
+
+  foreach(_folly_runtime_required_path IN
+      LISTS _folly_runtime_required_paths)
+    if(NOT EXISTS "${_folly_runtime_required_path}")
+      message(FATAL_ERROR
+        "${_folly_cxx_runtime_provider} C++ runtime is incomplete: "
+        "${_folly_runtime_required_path} does not exist")
+    endif()
+  endforeach()
+
+  set(FOLLY_CXX_RUNTIME_COMPILE_FLAGS
+    "-nostdinc++"
+    "-isystem"
+    "${FOLLY_CXX_RUNTIME_INCLUDE}"
+  )
+  add_compile_options(
+    $<$<COMPILE_LANGUAGE:CXX>:-nostdinc++>
+    "$<$<COMPILE_LANGUAGE:CXX>:SHELL:-isystem ${FOLLY_CXX_RUNTIME_INCLUDE}>"
+  )
+  string(APPEND CMAKE_REQUIRED_FLAGS
+    " -nostdinc++ -isystem ${FOLLY_CXX_RUNTIME_INCLUDE}")
+
+  if(_folly_cxx_runtime_provider STREQUAL "APPLE")
+    message(STATUS
+      "Using upstream LLVM Clang with the Apple SDK C++ runtime: "
+      "${CMAKE_OSX_SYSROOT}")
+  else()
+    message(STATUS
+      "Using upstream LLVM Clang with the LLVM C++ runtime: "
+      "${FOLLY_LLVM_ROOT}")
+  endif()
+endif()
+
 if(NOT DEFINED IS_X86_64_ARCH AND ${CMAKE_SYSTEM_PROCESSOR} MATCHES "x86_64|AMD64")
   set(IS_X86_64_ARCH TRUE)
 else()
@@ -171,6 +309,23 @@ endif()
 include(FollyFunctions)
 
 include(folly-deps) # Find the required packages
+include("${FOLLY_DEPENDENCY_PROVIDER_MODULE}")
+if(APPLE AND _folly_cxx_runtime_provider STREQUAL "LLVM")
+  meta_validate_llvm_runtime_dependencies(
+    PACKAGE Folly
+    RUNTIME_ROOT "${FOLLY_LLVM_ROOT}"
+    TARGETS
+      Boost::context
+      Boost::filesystem
+      Boost::program_options
+      Boost::regex
+      fmt::fmt
+      gflags_shared
+      glog::glog
+    LIBRARIES
+      ${FOLLY_LINK_LIBRARIES}
+  )
+endif()
 include(FollyConfigChecks)
 configure_file(
   ${CMAKE_CURRENT_SOURCE_DIR}/CMake/folly-config.h.cmake
@@ -234,7 +389,46 @@ list(APPEND hfiles
 # Generate pkg-config variables from folly_deps before we add our own
 # build/install-time include directory generator expressions
 include(GenPkgConfig)
+
+# Runtime flags in CMAKE_REQUIRED_FLAGS are needed by feature probes, but they
+# are not automatically part of Folly's consumer ABI. Apple-runtime consumers
+# must select their own SDK; LLVM-runtime consumer flags are added explicitly
+# below from the exported runtime contract.
+set(_folly_saved_cmake_required_flags "${CMAKE_REQUIRED_FLAGS}")
+if(FOLLY_CXX_RUNTIME_COMPILE_FLAGS)
+  string(REPLACE
+    "-nostdinc++ -isystem ${FOLLY_CXX_RUNTIME_INCLUDE}"
+    ""
+    CMAKE_REQUIRED_FLAGS
+    "${CMAKE_REQUIRED_FLAGS}"
+  )
+endif()
 gen_pkgconfig_vars(FOLLY_PKGCONFIG folly_deps)
+set(CMAKE_REQUIRED_FLAGS "${_folly_saved_cmake_required_flags}")
+unset(_folly_saved_cmake_required_flags)
+
+if(FOLLY_CXX_RUNTIME_INSTALL_COMPILE_OPTIONS)
+  string(JOIN
+    " "
+    _folly_pkgconfig_runtime_cflags
+    ${FOLLY_CXX_RUNTIME_INSTALL_COMPILE_OPTIONS}
+  )
+  string(APPEND
+    FOLLY_PKGCONFIG_CFLAGS
+    " ${_folly_pkgconfig_runtime_cflags}"
+  )
+endif()
+if(FOLLY_CXX_RUNTIME_INSTALL_LINK_OPTIONS)
+  string(JOIN
+    " "
+    _folly_pkgconfig_runtime_link_options
+    ${FOLLY_CXX_RUNTIME_INSTALL_LINK_OPTIONS}
+  )
+  string(APPEND
+    FOLLY_PKGCONFIG_PRIVATE_LIBS
+    " ${_folly_pkgconfig_runtime_link_options}"
+  )
+endif()
 
 target_include_directories(folly_deps
   BEFORE

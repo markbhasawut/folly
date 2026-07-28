@@ -167,8 +167,28 @@ cmake_path(REMOVE_FILENAME glog_lib)
 set(libs "-L${CMAKE_CURRENT_BINARY_DIR}:${CMAKE_BINARY_DIR}:${glog_lib}")
 
 if(APPLE)
+  set(_setup_platform_flags "-isysroot" "${CMAKE_OSX_SYSROOT}")
+  foreach(_architecture IN LISTS CMAKE_OSX_ARCHITECTURES)
+    list(APPEND _setup_platform_flags "-arch" "${_architecture}")
+  endforeach()
+  string(JOIN " " _setup_platform_flags_string ${_setup_platform_flags})
+
+  set(_setup_cxx_flags
+    ${_setup_platform_flags}
+    ${FOLLY_CXX_RUNTIME_COMPILE_FLAGS}
+  )
+  string(JOIN " " _setup_cxx_flags_string ${_setup_cxx_flags})
+  string(JOIN
+    " "
+    _setup_runtime_link_flags_string
+    ${FOLLY_CXX_RUNTIME_LINK_FLAGS}
+  )
+
   string(
     CONCAT DEFAULT_SETUP_LDFLAGS
+    "${CMAKE_SHARED_LINKER_FLAGS} "
+    "${_setup_platform_flags_string} "
+    "${_setup_runtime_link_flags_string} "
     "-Wl,-rpath,${CMAKE_INSTALL_PREFIX}/${LIB_INSTALL_DIR} "
     "-Wl,-undefined,dynamic_lookup"
   )
@@ -340,6 +360,13 @@ set(
   "CXX=${CMAKE_CXX_COMPILER}"
   "LDFLAGS=${SETUP_LDFLAGS}"
 )
+if(APPLE)
+  list(APPEND SETUP_BUILD_ENV
+    "SDKROOT=${CMAKE_OSX_SYSROOT}"
+    "CFLAGS=${_setup_platform_flags_string}"
+    "CXXFLAGS=${_setup_cxx_flags_string}"
+  )
+endif()
 if(APPLE AND CMAKE_OSX_DEPLOYMENT_TARGET)
   list(
     APPEND SETUP_BUILD_ENV

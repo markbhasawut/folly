@@ -72,6 +72,120 @@ function(_meta_get_imported_location _output _target)
   set("${_output}" "" PARENT_SCOPE)
 endfunction()
 
+function(_meta_validate_imported_includes _target _prefix _package)
+  get_target_property(_aliased_target "${_target}" ALIASED_TARGET)
+  if(_aliased_target)
+    set(_target "${_aliased_target}")
+  endif()
+
+  get_target_property(
+    _include_directories "${_target}" INTERFACE_INCLUDE_DIRECTORIES)
+  if(NOT _include_directories)
+    return()
+  endif()
+
+  foreach(_include_directory IN LISTS _include_directories)
+    if(_include_directory MATCHES "^\\$<" OR
+       NOT IS_ABSOLUTE "${_include_directory}")
+      continue()
+    endif()
+
+    get_filename_component(_include_directory "${_include_directory}" REALPATH)
+    _meta_path_is_under_prefix(
+      _include_matches_prefix "${_include_directory}" "${_prefix}")
+    if(NOT _include_matches_prefix)
+      message(FATAL_ERROR
+        "${_package}: mixed Meta dependency providers detected.\n"
+        "  Target: ${_target}\n"
+        "  Imported include directory: ${_include_directory}\n"
+        "  Required prefix: ${_prefix}\n"
+        "Use matching headers and libraries from the selected provider. "
+        "Umbrella prefixes must not shadow a Meta-stack dependency header.")
+    endif()
+  endforeach()
+endfunction()
+
+function(meta_validate_llvm_runtime_dependencies)
+  if(NOT APPLE)
+    return()
+  endif()
+
+  cmake_parse_arguments(
+    PARSE_ARGV 0
+    META_RUNTIME
+    ""
+    "PACKAGE;RUNTIME_ROOT"
+    "TARGETS;LIBRARIES"
+  )
+  if(META_RUNTIME_PACKAGE)
+    set(_package "${META_RUNTIME_PACKAGE}")
+  else()
+    set(_package "Meta C++ dependency stack")
+  endif()
+  if(NOT META_RUNTIME_RUNTIME_ROOT)
+    message(FATAL_ERROR
+      "${_package}: LLVM runtime validation requires RUNTIME_ROOT")
+  endif()
+
+  set(_runtime_candidates ${META_RUNTIME_LIBRARIES})
+  foreach(_target IN LISTS META_RUNTIME_TARGETS)
+    if(TARGET "${_target}")
+      _meta_get_imported_location(_location "${_target}")
+      if(_location)
+        list(APPEND _runtime_candidates "${_location}")
+      endif()
+    endif()
+  endforeach()
+  list(REMOVE_DUPLICATES _runtime_candidates)
+
+  set(_mixed_runtime_dependencies)
+  foreach(_candidate IN LISTS _runtime_candidates)
+    if(TARGET "${_candidate}")
+      _meta_get_imported_location(_candidate "${_candidate}")
+    endif()
+    if(NOT IS_ABSOLUTE "${_candidate}" OR
+       NOT EXISTS "${_candidate}" OR
+       NOT _candidate MATCHES "\\.dylib$")
+      continue()
+    endif()
+
+    execute_process(
+      COMMAND /usr/bin/otool -L "${_candidate}"
+      RESULT_VARIABLE _otool_result
+      OUTPUT_VARIABLE _otool_output
+      ERROR_VARIABLE _otool_error
+    )
+    if(NOT _otool_result EQUAL 0)
+      message(FATAL_ERROR
+        "${_package}: unable to inspect ${_candidate} with otool:\n"
+        "${_otool_error}")
+    endif()
+
+    if(_otool_output MATCHES
+        "[\n\r][ \t]+/usr/lib/libc\\+\\+\\.1\\.dylib[ \t]" OR
+       _otool_output MATCHES
+        "[\n\r][ \t]+/usr/lib/libc\\+\\+abi\\.dylib[ \t]" OR
+       _otool_output MATCHES
+        "[\n\r][ \t]+/usr/lib/system/libunwind\\.dylib[ \t]")
+      list(APPEND _mixed_runtime_dependencies "${_candidate}")
+    endif()
+  endforeach()
+
+  if(_mixed_runtime_dependencies)
+    list(REMOVE_DUPLICATES _mixed_runtime_dependencies)
+    list(JOIN _mixed_runtime_dependencies "\n    " _mixed_runtime_report)
+    message(FATAL_ERROR
+      "${_package}: full LLVM C++ runtime requested, but imported C++ "
+      "dependencies load Apple's C++ runtime:\n"
+      "    ${_mixed_runtime_report}\n"
+      "This would load two libc++/libc++abi implementations and break "
+      "exceptions, process teardown, and fork handling. Rebuild every C++ "
+      "dependency with the matched runtime under "
+      "${META_RUNTIME_RUNTIME_ROOT}, or configure "
+      "FOLLY_CXX_RUNTIME_PROVIDER=APPLE.")
+  endif()
+endfunction()
+
 function(_meta_path_is_under_prefix _output _path _prefix)
   file(TO_CMAKE_PATH "${_path}" _path)
   file(TO_CMAKE_PATH "${_prefix}" _prefix)
@@ -191,6 +305,8 @@ function(meta_validate_dependency_provider)
     if(NOT _location)
       continue()
     endif()
+    _meta_validate_imported_includes(
+      "${_target}" "${_required_prefix}" "${_package}")
     get_filename_component(_location "${_location}" REALPATH)
     _meta_path_is_under_prefix(
       _location_matches_prefix "${_location}" "${_required_prefix}")

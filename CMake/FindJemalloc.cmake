@@ -96,6 +96,11 @@ if(Jemalloc_FOUND AND NOT TARGET Jemalloc::jemalloc)
     PROPERTIES
       IMPORTED_LOCATION "${Jemalloc_LIBRARY}"
       INTERFACE_INCLUDE_DIRECTORIES "${Jemalloc_INCLUDE_DIR}"
+      # Imported targets are treated as system includes by default. Keep the
+      # selected jemalloc prefix as a regular include so it stays ahead of
+      # umbrella prefixes such as Homebrew, which may expose a different
+      # jemalloc ABI through /opt/homebrew/include.
+      IMPORTED_NO_SYSTEM TRUE
   )
 endif()
 

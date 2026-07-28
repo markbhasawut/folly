@@ -162,7 +162,13 @@ find_package(ZLIB MODULE)
 set(FOLLY_HAVE_LIBZ ${ZLIB_FOUND})
 if (ZLIB_FOUND)
   list(APPEND FOLLY_INCLUDE_DIRECTORIES ${ZLIB_INCLUDE_DIRS})
-  list(APPEND FOLLY_LINK_LIBRARIES ${ZLIB_LIBRARIES})
+  if(APPLE)
+    # The SDK path is a build-time implementation detail. Export the platform
+    # library name so installed targets select zlib from their own SDK.
+    list(APPEND FOLLY_LINK_LIBRARIES z)
+  else()
+    list(APPEND FOLLY_LINK_LIBRARIES ${ZLIB_LIBRARIES})
+  endif()
   list(APPEND CMAKE_REQUIRED_LIBRARIES ${ZLIB_LIBRARIES})
 endif()
 
@@ -181,7 +187,13 @@ find_package(BZip2 MODULE)
 set(FOLLY_HAVE_LIBBZ2 ${BZIP2_FOUND})
 if (BZIP2_FOUND)
   list(APPEND FOLLY_INCLUDE_DIRECTORIES ${BZIP2_INCLUDE_DIRS})
-  list(APPEND FOLLY_LINK_LIBRARIES ${BZIP2_LIBRARIES})
+  if(APPLE)
+    # As with zlib, do not bake the configuring SDK's absolute .tbd path into
+    # the installed CMake package.
+    list(APPEND FOLLY_LINK_LIBRARIES bz2)
+  else()
+    list(APPEND FOLLY_LINK_LIBRARIES ${BZIP2_LIBRARIES})
+  endif()
 endif()
 
 find_package(LibLZMA MODULE)
@@ -248,9 +260,19 @@ if (PYTHON_EXTENSIONS)
 endif ()
 
 find_package(LibUnwind)
-list(APPEND FOLLY_LINK_LIBRARIES ${LIBUNWIND_LIBRARIES})
-list(APPEND FOLLY_INCLUDE_DIRECTORIES ${LIBUNWIND_INCLUDE_DIRS})
 if (LIBUNWIND_FOUND)
+  if(APPLE AND _folly_cxx_runtime_provider STREQUAL "APPLE")
+    # Darwin's libSystem reexports the platform unwinder. Explicitly linking
+    # the SDK's usr/lib/system/libunwind.tbd is unnecessary and would make the
+    # installed target depend on the exact SDK used to build Folly.
+  elseif(APPLE AND _folly_cxx_runtime_provider STREQUAL "LLVM")
+    # The exported LLVM runtime link directories select the matching unwinder.
+    # A bare name keeps the package independent of the build tree.
+    list(APPEND FOLLY_LINK_LIBRARIES unwind)
+  else()
+    list(APPEND FOLLY_LINK_LIBRARIES ${LIBUNWIND_LIBRARIES})
+  endif()
+  list(APPEND FOLLY_INCLUDE_DIRECTORIES ${LIBUNWIND_INCLUDE_DIRS})
   set(FOLLY_HAVE_LIBUNWIND ON)
 endif()
 if (CMAKE_SYSTEM_NAME MATCHES "FreeBSD")
@@ -409,6 +431,28 @@ if (NOT DEFINED fmt_CONFIG)
 endif()
 target_link_libraries(folly_deps INTERFACE fmt::fmt)
 
+foreach(_folly_runtime_compile_option IN
+    LISTS FOLLY_CXX_RUNTIME_INSTALL_COMPILE_OPTIONS)
+  target_compile_options(folly_deps INTERFACE
+    "$<INSTALL_INTERFACE:${_folly_runtime_compile_option}>"
+  )
+endforeach()
+foreach(_folly_runtime_link_option IN
+    LISTS FOLLY_CXX_RUNTIME_INSTALL_LINK_OPTIONS)
+  target_link_options(folly_deps INTERFACE
+    "$<INSTALL_INTERFACE:${_folly_runtime_link_option}>"
+  )
+endforeach()
+
+# SDK headers are implicit under -isysroot. Exporting the SDK's usr/include as
+# a normal -I path breaks the required Darwin header ordering in setuptools
+# and other build-system consumers.
+if(APPLE AND IS_ABSOLUTE "${CMAKE_OSX_SYSROOT}")
+  list(REMOVE_ITEM
+    FOLLY_INCLUDE_DIRECTORIES
+    "${CMAKE_OSX_SYSROOT}/usr/include"
+  )
+endif()
 list(REMOVE_DUPLICATES FOLLY_INCLUDE_DIRECTORIES)
 if(NOT "${CMAKE_SOURCE_DIR}" STREQUAL "${PROJECT_SOURCE_DIR}")
   # When consumed via add_subdirectory/FetchContent, wrap each include
