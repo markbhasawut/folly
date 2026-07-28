@@ -156,6 +156,11 @@ the `build.bat` script instead. Its a wrapper around `getdeps.py`.
 If you don't want to let getdeps invoke cmake for you then by default, building the tests is disabled as part of the CMake `all` target.
 To build the tests, specify `-DBUILD_TESTS=ON` to CMake at configure time.
 
+When Folly is installed with the other Meta C++ libraries, read
+[Single-provider dependency builds](folly/docs/DependencyProvider.md). On
+macOS the installed CMake packages reject allocator and Meta-library mixtures
+across prefixes by default.
+
 NB if you want to invoke `cmake` again to iterate on a `getdeps.py` build, there is a helpful `run_cmake.py` script output in the scratch-path build directory. You can find the scratch build directory from logs or with `python3 ./build/fbcode_builder/getdeps.py show-build-dir`.
 
 Running tests with ctests also works if you cd to the build dir, e.g.

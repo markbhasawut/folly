@@ -15,6 +15,9 @@ include(CMakeFindDependencyMacro)
 set_and_check(FOLLY_INCLUDE_DIRS "@PACKAGE_INCLUDE_INSTALL_DIR@")
 set_and_check(FOLLY_INCLUDE_DIR "@PACKAGE_INCLUDE_INSTALL_DIR@")
 set_and_check(FOLLY_CMAKE_DIR "@PACKAGE_CMAKE_INSTALL_DIR@")
+set_and_check(
+  FOLLY_DEPENDENCY_PROVIDER_MODULE
+  "${FOLLY_CMAKE_DIR}/MetaDependencyProvider.cmake")
 
 # find_dependency() ends up changing PACKAGE_PREFIX_DIR, so save
 # folly's prefix directory in the FOLLY_PREFIX_DIR variable
@@ -45,6 +48,21 @@ endif()
 # Include the folly-targets.cmake file, which is generated from our CMake rules
 if (NOT TARGET Folly::folly)
   include("${FOLLY_CMAKE_DIR}/folly-targets.cmake")
+endif()
+
+include("${FOLLY_DEPENDENCY_PROVIDER_MODULE}")
+if(TARGET Jemalloc::jemalloc)
+  meta_validate_dependency_provider(
+    PACKAGE Folly
+    ANCHOR_TARGET Folly::folly
+    TARGETS Jemalloc::jemalloc Folly::folly
+  )
+else()
+  meta_validate_dependency_provider(
+    PACKAGE Folly
+    ANCHOR_TARGET Folly::folly
+    TARGETS Folly::folly
+  )
 endif()
 
 # Set FOLLY_LIBRARIES from our Folly::folly target

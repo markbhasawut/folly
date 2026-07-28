@@ -67,6 +67,12 @@ set(BIN_INSTALL_DIR bin CACHE STRING
     "The subdirectory where binaries should be installed")
 set(CMAKE_INSTALL_DIR lib/cmake/folly CACHE STRING
     "The subdirectory where CMake package config files should be installed")
+set(
+  FOLLY_DEPENDENCY_PROVIDER_MODULE
+  "${CMAKE_CURRENT_SOURCE_DIR}/CMake/MetaDependencyProvider.cmake"
+  CACHE INTERNAL
+  "Folly's single-provider dependency validation module"
+)
 
 option(BUILD_SHARED_LIBS
   "If enabled, build folly as a shared library.  \
@@ -270,6 +276,15 @@ folly_create_monolithic_library()
 # Resolve deferred dependencies (must be after monolithic library is created)
 folly_resolve_deferred_dependencies()
 
+include("${FOLLY_DEPENDENCY_PROVIDER_MODULE}")
+if(TARGET Jemalloc::jemalloc)
+  meta_validate_dependency_provider(
+    PACKAGE Folly
+    ANCHOR_TARGET Jemalloc::jemalloc
+    TARGETS Jemalloc::jemalloc
+  )
+endif()
+
 # Let find_resource() fall back to the configured installation when resources
 # are not copied beside a test executable. FOLLY_TEST_RESOURCE_ROOT can
 # override this path at runtime for staged or relocated installations.
@@ -332,7 +347,9 @@ install(
   COMPONENT dev
 )
 install(
-  FILES CMake/FindJemalloc.cmake
+  FILES
+    CMake/FindJemalloc.cmake
+    CMake/MetaDependencyProvider.cmake
   DESTINATION ${CMAKE_INSTALL_DIR}
   COMPONENT dev
 )
