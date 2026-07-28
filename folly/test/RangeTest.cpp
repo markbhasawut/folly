@@ -39,7 +39,15 @@
 #include <folly/container/span.h>
 
 #if __has_include(<range/v3/range/concepts.hpp>)
+#if defined(__APPLE__) && !defined(META_NO_STD_FORWARD_DECLARATIONS)
+#define META_NO_STD_FORWARD_DECLARATIONS 1
+#define FOLLY_RANGE_TEST_UNDEF_META_NO_STD_FORWARD_DECLARATIONS 1
+#endif
 #include <range/v3/range/concepts.hpp>
+#if defined(FOLLY_RANGE_TEST_UNDEF_META_NO_STD_FORWARD_DECLARATIONS)
+#undef FOLLY_RANGE_TEST_UNDEF_META_NO_STD_FORWARD_DECLARATIONS
+#undef META_NO_STD_FORWARD_DECLARATIONS
+#endif
 
 // Check conformance with the C++20 range concepts as specified
 // by the range-v3 library.

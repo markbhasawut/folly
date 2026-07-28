@@ -16,7 +16,16 @@
 
 #pragma once
 
+#if defined(__APPLE__) && !defined(META_NO_STD_FORWARD_DECLARATIONS)
+#define META_NO_STD_FORWARD_DECLARATIONS 1
+#define FOLLY_CHANNELS_UNDEF_META_NO_STD_FORWARD_DECLARATIONS 1
+#endif
 #include <range/v3/view/map.hpp>
+#if defined(FOLLY_CHANNELS_UNDEF_META_NO_STD_FORWARD_DECLARATIONS)
+#undef FOLLY_CHANNELS_UNDEF_META_NO_STD_FORWARD_DECLARATIONS
+#undef META_NO_STD_FORWARD_DECLARATIONS
+#endif
+
 #include <folly/channels/Channel.h>
 #include <folly/channels/FanoutSender.h>
 #include <folly/channels/OnClosedException.h>
