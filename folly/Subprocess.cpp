@@ -712,20 +712,29 @@ void Subprocess::spawnInternal(
       // We're setting both ends of the pipe as close-on-exec. The child
       // doesn't need to reset the flag on its end, as we always dup2() the fd,
       // and dup2() fds don't share the close-on-exec flag.
+      bool closeOnExecWasAtomic = false;
 #if FOLLY_HAVE_PIPE2
       // If possible, set close-on-exec atomically. Otherwise, a concurrent
       // Subprocess invocation can fork() between "pipe" and "fnctl",
       // causing FDs to leak.
-      r = ::pipe2(fds, O_CLOEXEC);
-      checkUnixError(r, "pipe2");
-#else
-      r = fileops::pipe(fds);
-      checkUnixError(r, "pipe");
-      r = fcntl(fds[0], F_SETFD, FD_CLOEXEC);
-      checkUnixError(r, "set FD_CLOEXEC");
-      r = fcntl(fds[1], F_SETFD, FD_CLOEXEC);
-      checkUnixError(r, "set FD_CLOEXEC");
+#if defined(__APPLE__)
+      if (__builtin_available(macOS 27.0, *)) {
 #endif
+        r = ::pipe2(fds, O_CLOEXEC);
+        checkUnixError(r, "pipe2");
+        closeOnExecWasAtomic = true;
+#if defined(__APPLE__)
+      }
+#endif
+#endif
+      if (!closeOnExecWasAtomic) {
+        r = fileops::pipe(fds);
+        checkUnixError(r, "pipe");
+        r = fcntl(fds[0], F_SETFD, FD_CLOEXEC);
+        checkUnixError(r, "set FD_CLOEXEC");
+        r = fcntl(fds[1], F_SETFD, FD_CLOEXEC);
+        checkUnixError(r, "set FD_CLOEXEC");
+      }
       pipes_.emplace_back();
       Pipe& pipe = pipes_.back();
       pipe.direction = p.second;
